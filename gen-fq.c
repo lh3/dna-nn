@@ -61,7 +61,7 @@ reghash_t *reg_read(const char *fn)
 		r = &kh_val(h, k);
 		if (r->n == r->m) {
 			r->m = r->m? r->m<<1 : 4;
-			r->a = realloc(r->a, r->m * sizeof(intv1_t));
+			r->a = (intv1_t*)realloc(r->a, r->m * sizeof(intv1_t));
 		}
 		r->a[r->n].st = st;
 		r->a[r->n].en = en;
