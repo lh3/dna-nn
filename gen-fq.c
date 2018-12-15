@@ -38,7 +38,7 @@ reghash_t *reg_read(const char *fn)
 		reglist_t *r;
 		khint_t k;
 		for (p = q = str.s, i = 0;; ++q) {
-			if (*q == 0 || *q == '\n') {
+			if (*q == 0 || *q == '\t') {
 				int c = *q;
 				*q = 0;
 				if (i == 0) ctg = p;
