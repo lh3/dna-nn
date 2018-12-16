@@ -2,6 +2,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include "dna-io.h"
 #include "kann.h"
 
@@ -38,7 +39,15 @@ void dn_train(kann_t *ann, dn_seqs_t *dr, int ulen, float lr, int m_epoch, int m
 {
 	float **x[2], **y, *r, grad_clip = 10.0f, min_cost = 1e30f;
 	kann_t *ua;
-	int epoch, u, k, n_var, tot_len = 0;
+	kad_node_t *p;
+	int epoch, u, k, n_var, tot_len = 0, n_lbl, out_id;
+
+	out_id = kann_find(ann, KANN_F_OUT, 0);
+	assert(out_id >= 0);
+	p = ann->v[out_id];
+	assert(p->n_d == 2);
+	n_lbl = p->d[1];
+	assert(n_lbl == dr->n_lbl);
 
 	x[0] = (float**)calloc(ulen, sizeof(float*));
 	x[1] = (float**)calloc(ulen, sizeof(float*));
@@ -46,7 +55,7 @@ void dn_train(kann_t *ann, dn_seqs_t *dr, int ulen, float lr, int m_epoch, int m
 	for (u = 0; u < ulen; ++u) {
 		x[0][u] = (float*)calloc(4 * mbs, sizeof(float));
 		x[1][u] = (float*)calloc(4 * mbs, sizeof(float));
-		y[u]    = (float*)calloc(2 * mbs, sizeof(float));
+		y[u]    = (float*)calloc(n_lbl * mbs, sizeof(float));
 	}
 	n_var = kann_size_var(ann);
 	r = (float*)calloc(n_var, sizeof(float));
@@ -67,7 +76,7 @@ void dn_train(kann_t *ann, dn_seqs_t *dr, int ulen, float lr, int m_epoch, int m
 			for (u = 0; u < ulen; ++u) {
 				memset(x[0][u], 0, 4 * mbs * sizeof(float));
 				memset(x[1][u], 0, 4 * mbs * sizeof(float));
-				memset(y[u],    0, 2 * mbs * sizeof(float));
+				memset(y[u],    0, n_lbl * mbs * sizeof(float));
 			}
 			for (b = 0; b < mbs; ++b) {
 				for (;;) {
@@ -81,7 +90,7 @@ void dn_train(kann_t *ann, dn_seqs_t *dr, int ulen, float lr, int m_epoch, int m
 					if (c >= 4) continue;
 					x[0][u][b * 4 + c] = 1.0f;
 					x[1][ulen - 1 - u][b * 4 + (3 - c)] = 1.0f;
-					y[u][b * 2 + a] = 1.0f;
+					y[u][b * n_lbl + a] = 1.0f;
 				}
 			}
 			cost += kann_cost(ua, 0, 1) * ulen * mbs;
@@ -179,7 +188,7 @@ int main(int argc, char *argv[])
 		else if (c == 'i') fn_in = optarg;
 		else if (c == 'A') to_apply = 1;
 		else if (c == 't') n_threads = atoi(optarg);
-		else if (c == 'T') is_tied = 0;
+		else if (c == 'T') is_tied = 0; // for debugging only; weights should be tiled for DNA sequences
 		else if (c == 'b') batch_len = atoi(optarg);
 	}
 	if (argc - optind < 1) {
