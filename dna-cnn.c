@@ -159,6 +159,7 @@ int main(int argc, char *argv[])
 		fprintf(fp, "    -m INT      max number of epochs [%d]\n", max_epoch);
 		fprintf(fp, "    -c STR      process INT nucleotides per epoch [%d]\n", chunk_size);
 		fprintf(fp, "    -B INT      mini-batch size [%d]\n", mb_size);
+		fprintf(fp, "    -t INT      number of threads [%d]\n", n_threads);
 		return 1;
 	}
 

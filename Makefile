@@ -1,4 +1,5 @@
 CFLAGS=		-g -Wall -O2 -Wc++-compat #-Wextra
+CPPFLAGS=	-DHAVE_PTHREAD
 OBJS=		kautodiff.o kann.o dna-io.o
 PROG=		gen-fq dna-cnn
 LIBS=		-lm -lz -lpthread
