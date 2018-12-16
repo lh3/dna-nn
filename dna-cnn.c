@@ -41,7 +41,7 @@ static void train(kann_t *ann, dn_seqs_t *tr, dn_seqs_t *va, float lr, int mb_si
 				double u;
 				int partial_len = 0, sum;
 				u = kann_drand();
-				for (i = 0; i < tr->n; ++i)
+				for (i = 0; i < tr->n; partial_len += tr->len[i], ++i)
 					if (partial_len + tr->len[i] > tot_len_tr * u)
 						break;
 				j = (int)((tr->len[i] - len + 1) * kann_drand());
@@ -151,6 +151,7 @@ int main(int argc, char *argv[])
 	if (fn_in) ann = kann_load(fn_in);
 	if (ann == 0 || !to_apply)
 		s = dn_read(argv[optind]);
+	fprintf(stderr, "[M::%s] %d labels in the input\n", __func__, s->n_lbl);
 
 	if (to_apply && ann) {
 		gzFile fp;

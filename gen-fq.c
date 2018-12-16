@@ -92,6 +92,7 @@ int main(int argc, char *argv[])
 	gzFile fp;
 	kseq_t *ks;
 	int c;
+	uint64_t n_ovlp = 0;
 
 	while ((c = ketopt(&o, argc, argv, 1, "", 0)) >= 0) {
 	}
@@ -117,8 +118,10 @@ int main(int argc, char *argv[])
 			reglist_t *p = &kh_val(h, k);
 			int i, j;
 			for (i = 0; i < p->n; ++i)
-				for (j = p->a[i].st; j < p->a[i].en; ++j)
-					ks->qual.s[j] += p->a[i].x;
+				for (j = p->a[i].st; j < p->a[i].en; ++j) {
+					if (ks->qual.s[j] != 33) ++n_ovlp;
+					ks->qual.s[j] = p->a[i].x + 33;
+				}
 		}
 		printf("@%s\n", ks->name.s);
 		puts(ks->seq.s);
@@ -128,5 +131,7 @@ int main(int argc, char *argv[])
 	reg_destroy(h);
 	kseq_destroy(ks);
 	gzclose(fp);
+	if (n_ovlp > 0)
+		fprintf(stderr, "WARNING: %ld overlapping bases in BED\n", (long)n_ovlp);
 	return 0;
 }
