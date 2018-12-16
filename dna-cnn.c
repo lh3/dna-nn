@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <assert.h>
+#include "ketopt.h"
 #include "kann.h"
 #include "dna-io.h"
 #include "kseq.h"
@@ -98,35 +98,36 @@ int main(int argc, char *argv[])
 	kann_t *ann = 0;
 	char *fn_in = 0, *fn_out = 0;
 	dn_seqs_t *s = 0;
+	ketopt_t o = KETOPT_INIT;
 
-	fprintf(stderr, "Command line: ");
+	fprintf(stderr, "[M::%s] command line: ", __func__);
 	for (c = 0; c < argc; ++c) {
 		if (c) fprintf(stderr, " ");
 		fprintf(stderr, "%s", argv[c]);
 	}
 	fputc('\n', stderr);
-	while ((c = getopt(argc, argv, "n:s:r:m:B:o:i:d:k:f:w:Ac:t:")) >= 0) {
-		if (c == 'n') n_h_neurons = atoi(optarg);
-		else if (c == 's') seed = atoi(optarg);
-		else if (c == 'i') fn_in = optarg;
-		else if (c == 'o') fn_out = optarg;
-		else if (c == 'f') n_flt = atoi(optarg);
-		else if (c == 'r') lr = atof(optarg);
-		else if (c == 'm') max_epoch = atoi(optarg);
-		else if (c == 'B') mb_size = atoi(optarg);
-		else if (c == 'd') h_dropout = atof(optarg);
-		else if (c == 'k') k_size = atoi(optarg);
+	while ((c = ketopt(&o, argc, argv, 1, "n:s:r:m:B:o:i:d:k:f:w:Ac:t:", 0)) >= 0) {
+		if (c == 'n') n_h_neurons = atoi(o.arg);
+		else if (c == 's') seed = atoi(o.arg);
+		else if (c == 'i') fn_in = o.arg;
+		else if (c == 'o') fn_out = o.arg;
+		else if (c == 'f') n_flt = atoi(o.arg);
+		else if (c == 'r') lr = atof(o.arg);
+		else if (c == 'm') max_epoch = atoi(o.arg);
+		else if (c == 'B') mb_size = atoi(o.arg);
+		else if (c == 'd') h_dropout = atof(o.arg);
+		else if (c == 'k') k_size = atoi(o.arg);
 		else if (c == 'A') to_apply = 1;
-		else if (c == 't') n_threads = atoi(optarg);
-		else if (c == 'w') ws = atoi(optarg);
+		else if (c == 't') n_threads = atoi(o.arg);
+		else if (c == 'w') ws = atoi(o.arg);
 		else if (c == 'c') {
 			char *p;
-			chunk_size = strtol(optarg, &p, 10);
+			chunk_size = strtol(o.arg, &p, 10);
 			if (*p == 'm' || *p == 'M') chunk_size *= 1024*1024;
 			else if (*p == 'k' || *p == 'K') chunk_size *= 1024;
 		}
 	}
-	if (argc == optind && fn_in == 0) {
+	if (argc == o.ind && fn_in == 0) {
 		FILE *fp = stdout;
 		fprintf(fp, "Usage: dna-cnn [options] <in.fq>\n");
 		fprintf(fp, "Options:\n");
@@ -153,10 +154,9 @@ int main(int argc, char *argv[])
 	kad_trap_fe();
 	if (fn_in) ann = kann_load(fn_in);
 	if (ann == 0 || !to_apply) {
-		s = dn_read(argv[optind]);
+		s = dn_read(argv[o.ind]);
 		fprintf(stderr, "[M::%s] %d labels in the input\n", __func__, s->n_lbl);
 	}
-	fprintf(stderr, "here\n");
 
 	if (to_apply && ann) {
 		gzFile fp;
@@ -168,7 +168,7 @@ int main(int argc, char *argv[])
 		ws = kann_dim_in(ann) / 8;
 		x = (float*)malloc(ws * 8 * sizeof(float));
 		seq4 = (uint8_t*)calloc(ws + 1, 1);
-		fp = gzopen(argv[optind], "r");
+		fp = gzopen(argv[o.ind], "r");
 		seq = kseq_init(fp);
 		while (kseq_read(seq) >= 0) {
 			int i, j;

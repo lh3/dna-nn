@@ -26,7 +26,7 @@ depend:
 
 # DO NOT DELETE
 
-dna-cnn.o: kann.h kautodiff.h dna-io.h kseq.h
+dna-cnn.o: ketopt.h kann.h kautodiff.h dna-io.h kseq.h
 dna-io.o: dna-io.h kseq.h
 gen-fq.o: ketopt.h kseq.h khash.h
 kann.o: kann.h kautodiff.h
