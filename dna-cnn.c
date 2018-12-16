@@ -93,7 +93,8 @@ static kann_t *model_gen(int n_lbl, int len, int k_size, int n_flt, int n_h_neur
 
 int main(int argc, char *argv[])
 {
-	int c, seed = 11, ws = 100, n_flt = 32, k_size = 17, n_h_neurons = 64, to_apply = 0, max_epoch = 100, mb_size = 64, chunk_size = 50000000, n_threads = 1;
+	int seed = 11, ws = 100, n_flt = 32, k_size = 17, n_h_neurons = 64, max_epoch = 100, mb_size = 64, chunk_size = 50000000, n_threads = 1;
+	int c, to_apply = 0, n_lbl = 0;
 	float h_dropout = 0.1f, lr = 0.001f;
 	kann_t *ann = 0;
 	char *fn_in = 0, *fn_out = 0;
@@ -152,10 +153,22 @@ int main(int argc, char *argv[])
 
 	kann_srand(seed);
 	kad_trap_fe();
-	if (fn_in) ann = kann_load(fn_in);
+	if (fn_in) {
+		int out_id;
+		kad_node_t *p;
+		ann = kann_load(fn_in);
+		assert(ann);
+		out_id = kann_find(ann, KANN_F_OUT, 0);
+		assert(out_id >= 0);
+		p = ann->v[out_id];
+		assert(p->n_d == 2);
+		n_lbl = p->d[1];
+		fprintf(stderr, "[M::%s] %d labels in the model\n", __func__, n_lbl);
+	}
 	if (ann == 0 || !to_apply) {
 		s = dn_read(argv[o.ind]);
 		fprintf(stderr, "[M::%s] %d labels in the input\n", __func__, s->n_lbl);
+		n_lbl = s->n_lbl;
 	}
 
 	if (to_apply && ann) {
@@ -171,25 +184,29 @@ int main(int argc, char *argv[])
 		fp = gzopen(argv[o.ind], "r");
 		seq = kseq_init(fp);
 		while (kseq_read(seq) >= 0) {
-			int i, j;
+			int i, j, cnt[128];
 			for (i = 0; i + ws < seq->seq.l; i += ws) {
 				const float *y;
-				float true_frac = -1.0f;
+				memset(cnt, 0, 128 * sizeof(int));
 				for (j = i; j < i + ws; ++j)
 					seq4[j-i] = seq_nt4_table[(uint8_t)seq->seq.s[j]];
 				dn_seq2vec_ds(ws, seq4, x);
 				y = kann_apply1(ann, x);
 				if (seq->qual.l) {
-					int n_sig = 0;
 					for (j = i; j < i + ws; ++j) {
 						int sig = seq->qual.s[j] - 33;
-						if (sig) ++n_sig;
+						++cnt[sig];
 						seq->seq.s[j] = sig? toupper(seq->seq.s[j]) : tolower(seq->seq.s[j]);
 					}
-					true_frac = (float)n_sig / ws;
 				}
 				memcpy(seq4, &seq->seq.s[i], ws);
-				printf("%s\t%.2f\t%.2f\n", (char*)seq4, 100.0 * true_frac, 100.0 * y[1]);
+				fputs((char*)seq4, stdout);
+				for (j = 1; j < n_lbl; ++j)
+					printf("\t%.2f", 100.0 * y[j]);
+				if (seq->qual.l)
+					for (j = 1; j < n_lbl; ++j)
+						printf("\t%.2f", 100.0 * cnt[j] / ws);
+				putchar('\n');
 			}
 		}
 		kseq_destroy(seq);
