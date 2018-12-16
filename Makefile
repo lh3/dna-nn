@@ -1,7 +1,7 @@
 CFLAGS=		-g -Wall -O2 -Wc++-compat #-Wextra
 CPPFLAGS=	-DHAVE_PTHREAD
 OBJS=		kautodiff.o kann.o dna-io.o
-PROG=		gen-fq dna-cnn
+PROG=		gen-fq dna-cnn dna-brnn
 LIBS=		-lm -lz -lpthread
 
 .PHONY:all clean depend
@@ -16,6 +16,9 @@ gen-fq:gen-fq.o
 		$(CC) -o $@ $< $(LIBS)
 
 dna-cnn:dna-cnn.o $(OBJS)
+		$(CC) -o $@ $^ $(LIBS)
+
+dna-brnn:dna-brnn.o $(OBJS)
 		$(CC) -o $@ $^ $(LIBS)
 
 clean:
