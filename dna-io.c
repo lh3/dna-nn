@@ -41,6 +41,21 @@ void dn_seq2vec_ds(int l, const uint8_t *seq4, float *x)
 	free(rev4);
 }
 
+int dn_select_seq(const dn_seqs_t *tr, double r)
+{
+	double x = tr->sum_len[tr->n - 1] * r;
+	int st = 0, en = tr->n - 1;
+	if (tr->n <= 0) return -1;
+	while (st < en) {
+		int mid = st + ((en - st) >> 1);
+		if (tr->sum_len[mid] < x) st = mid + 1;
+		else if (mid == 0) return 0;
+		else if (x >= tr->sum_len[mid - 1]) return mid;
+		else en = mid - 1;
+	}
+	return st;
+}
+
 dn_seqs_t *dn_read(const char *fn)
 {
 	gzFile fp;

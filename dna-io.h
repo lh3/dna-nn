@@ -14,6 +14,7 @@ typedef struct {
 extern unsigned char seq_nt4_table[256];
 
 void dn_seq2vec_ds(int l, const uint8_t *seq4, float *x);
+int dn_select_seq(const dn_seqs_t *tr, double r);
 dn_seqs_t *dn_read(const char *fn);
 void dn_destroy(dn_seqs_t *s);
 
