@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include "ketopt.h"
 #include "dna-io.h"
 #include "kann.h"
 
@@ -176,27 +177,28 @@ int main(int argc, char *argv[])
 	int batch_len = 1000000, mbs = 64, m_epoch = 50, n_threads = 1, is_tied = 1;
 	float h_dropout = 0.0f, lr = 0.001f;
 	char *fn_out = 0, *fn_in = 0;
+	ketopt_t o = KETOPT_INIT;
 
-	while ((c = getopt(argc, argv, "Au:l:n:m:B:o:i:t:Tb:")) >= 0) {
-		if (c == 'u') ulen = atoi(optarg);
-		else if (c == 'l') n_layer = atoi(optarg);
-		else if (c == 'n') n_neuron = atoi(optarg);
-		else if (c == 'r') lr = atof(optarg);
-		else if (c == 'm') m_epoch = atoi(optarg);
-		else if (c == 'B') mbs = atoi(optarg);
-		else if (c == 'o') fn_out = optarg;
-		else if (c == 'i') fn_in = optarg;
+	while ((c = ketopt(&o, argc, argv, 1, "Au:l:n:m:B:o:i:t:Tb:", 0)) >= 0) {
+		if (c == 'u') ulen = atoi(o.arg);
+		else if (c == 'l') n_layer = atoi(o.arg);
+		else if (c == 'n') n_neuron = atoi(o.arg);
+		else if (c == 'r') lr = atof(o.arg);
+		else if (c == 'm') m_epoch = atoi(o.arg);
+		else if (c == 'B') mbs = atoi(o.arg);
+		else if (c == 'o') fn_out = o.arg;
+		else if (c == 'i') fn_in = o.arg;
 		else if (c == 'A') to_apply = 1;
-		else if (c == 't') n_threads = atoi(optarg);
+		else if (c == 't') n_threads = atoi(o.arg);
 		else if (c == 'T') is_tied = 0; // for debugging only; weights should be tiled for DNA sequences
-		else if (c == 'b') batch_len = atoi(optarg);
+		else if (c == 'b') batch_len = atoi(o.arg);
 	}
-	if (argc - optind < 1) {
+	if (argc - o.ind < 1) {
 		fprintf(stderr, "Usage: dna-brnn [options] <seq.txt>\n");
 		return 1;
 	}
 
-	dr = dn_read(argv[optind]);
+	dr = dn_read(argv[o.ind]);
 	if (fn_in) ann = kann_load(fn_in);
 	if (!to_apply) {
 		if (ann == 0) ann = dn_model_gen(dr->n_lbl, n_layer, n_neuron, h_dropout, is_tied);

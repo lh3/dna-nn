@@ -29,6 +29,7 @@ depend:
 
 # DO NOT DELETE
 
+dna-brnn.o: ketopt.h dna-io.h kann.h kautodiff.h
 dna-cnn.o: ketopt.h kann.h kautodiff.h dna-io.h kseq.h
 dna-io.o: dna-io.h kseq.h
 gen-fq.o: ketopt.h kseq.h khash.h
