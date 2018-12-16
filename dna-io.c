@@ -60,9 +60,11 @@ dn_seqs_t *dn_read(const char *fn)
 		if (s->n == s->m) {
 			s->m = s->m? s->m<<1 : 16;
 			s->len = (int*)realloc(s->len, s->m * sizeof(int));
+			s->sum_len = (uint64_t*)realloc(s->sum_len, s->m * 8);
 			s->seq = (uint8_t**)realloc(s->seq, s->m * sizeof(uint8_t*));
 			s->lbl = (uint8_t**)realloc(s->lbl, s->m * sizeof(uint8_t*));
 		}
+		s->sum_len[s->n] = s->n == 0? ks->seq.l : s->sum_len[s->n - 1] + ks->seq.l;
 		s->len[s->n] = ks->seq.l;
 		s->seq[s->n] = (uint8_t*)malloc(ks->seq.l);
 		memcpy(s->seq[s->n], ks->seq.s, ks->seq.l);
@@ -88,5 +90,6 @@ void dn_destroy(dn_seqs_t *s)
 		if (s->lbl) free(s->lbl[i]);
 	}
 	free(s->seq); free(s->lbl);
+	free(s->len); free(s->sum_len);
 	free(s);
 }

@@ -9,13 +9,30 @@
 #include "kseq.h"
 KSEQ_DECLARE(gzFile)
 
-static void train(kann_t *ann, dn_seqs_t *tr, dn_seqs_t *va, float lr, int mb_size, int max_epoch, int chunk_size, const char *fn_out)
+static int get_seq(const dn_seqs_t *tr, double r)
+{
+	double x = tr->sum_len[tr->n - 1] * r;
+	int st = 0, en = tr->n - 1;
+	if (tr->n <= 0) return -1;
+	while (st < en) {
+		int mid = st + ((en - st) >> 1);
+		if (tr->sum_len[mid] < x) st = mid + 1;
+		else if (mid == 0) return 0;
+		else if (x >= tr->sum_len[mid - 1]) return mid;
+		else en = mid - 1;
+	}
+	return st;
+}
+
+// TODO: validation "va" is not used
+static void train(kann_t *ann, const dn_seqs_t *tr, const dn_seqs_t *va, float lr, int mb_size, int max_epoch, int chunk_size, const char *fn_out)
 {
 	int epoch, i, j, k, b, len, n_in, n_out, n_var, *cnt;
 	kad_node_t *in;
 	float *x, *y, *r;
 	uint64_t tot_len_tr;
 
+	assert(tr && tr->n > 0);
 	in = ann->v[kann_find(ann, KANN_F_IN, 0)];
 	len = in->d[2];
 	n_in  = kann_dim_in(ann);
@@ -38,12 +55,11 @@ static void train(kann_t *ann, dn_seqs_t *tr, dn_seqs_t *va, float lr, int mb_si
 		kann_set_batch_size(ann, mb_size);
 		while (n_proc < chunk_size) {
 			for (b = 0; b < mb_size; ++b) {
-				double u;
-				int partial_len = 0, sum;
-				u = kann_drand();
-				for (i = 0; i < tr->n; partial_len += tr->len[i], ++i)
-					if (partial_len + tr->len[i] > tot_len_tr * u)
-						break;
+				int sum;
+				for (;;) {
+					i = get_seq(tr, kann_drand());
+					if (tr->len[i] >= len) break;
+				}
 				j = (int)((tr->len[i] - len + 1) * kann_drand());
 				dn_seq2vec_ds(len, &tr->seq[i][j], &x[b * n_in]);
 				memset(cnt, 0, n_out * sizeof(int));

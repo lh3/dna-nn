@@ -8,6 +8,7 @@ typedef struct {
 	uint8_t **seq;
 	uint8_t **lbl;
 	int *len;
+	uint64_t *sum_len;
 } dn_seqs_t;
 
 extern unsigned char seq_nt4_table[256];
