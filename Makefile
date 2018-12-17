@@ -4,6 +4,11 @@ OBJS=		kautodiff.o kann.o dna-io.o
 PROG=		gen-fq dna-cnn dna-brnn
 LIBS=		-lm -lz -lpthread
 
+ifneq ($(asan),)
+	CFLAGS+=-fsanitize=address
+	LIBS+=-fsanitize=address
+endif
+
 .PHONY:all clean depend
 .SUFFIXES:.c .o
 

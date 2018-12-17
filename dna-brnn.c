@@ -6,6 +6,8 @@
 #include "ketopt.h"
 #include "dna-io.h"
 #include "kann.h"
+#include "kseq.h"
+KSEQ_DECLARE(gzFile)
 
 kann_t *dn_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, int is_tied)
 {
@@ -36,20 +38,24 @@ kann_t *dn_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, int 
 	return kann_new(t, 0);
 }
 
-void dn_train(kann_t *ann, dn_seqs_t *dr, int ulen, float lr, int m_epoch, int mbs, int n_threads, int batch_len, const char *fn)
+int dbr_get_n_lbl(const kann_t *ann)
 {
-	float **x[2], **y, *r, grad_clip = 10.0f, min_cost = 1e30f;
-	kann_t *ua;
+	int out_id;
 	kad_node_t *p;
-	int epoch, u, k, n_var, tot_len = 0, n_lbl, out_id;
-
 	out_id = kann_find(ann, KANN_F_OUT, 0);
 	assert(out_id >= 0);
 	p = ann->v[out_id];
 	assert(p->n_d == 2);
-	n_lbl = p->d[1];
-	assert(n_lbl == dr->n_lbl);
+	return p->d[1];
+}
 
+void dbr_train(kann_t *ann, dn_seqs_t *dr, int ulen, float lr, int m_epoch, int mbs, int n_threads, int batch_len, const char *fn)
+{
+	float **x[2], **y, *r, grad_clip = 10.0f, min_cost = 1e30f;
+	kann_t *ua;
+	int epoch, u, k, n_var, n_lbl;
+
+	n_lbl = dbr_get_n_lbl(ann);
 	x[0] = (float**)calloc(ulen, sizeof(float*));
 	x[1] = (float**)calloc(ulen, sizeof(float*));
 	y    = (float**)calloc(ulen, sizeof(float*));
@@ -60,8 +66,6 @@ void dn_train(kann_t *ann, dn_seqs_t *dr, int ulen, float lr, int m_epoch, int m
 	}
 	n_var = kann_size_var(ann);
 	r = (float*)calloc(n_var, sizeof(float));
-	for (k = 0; k < dr->n; ++k)
-		if (dr->len[k] >= ulen) tot_len += dr->len[k];
 
 	ua = kann_unroll(ann, ulen, ulen, ulen);
 	kann_mt(ua, n_threads, mbs);
@@ -110,76 +114,81 @@ void dn_train(kann_t *ann, dn_seqs_t *dr, int ulen, float lr, int m_epoch, int m
 	free(r); free(y); free(x[0]); free(x[1]);
 }
 
-void dn_predict1(kann_t *ua, float **x[2], char *str, int cnt[4])
+uint8_t *dbr_predict(kann_t *ann, const char *str, int ulen, int mbs, int n_threads)
 {
-	int u, ulen;
-	kad_node_t *out;
-	out = ua->v[kann_find(ua, KANN_F_OUT, 0)];
-	ulen = out->d[0];
-	for (u = 0; u < ulen; ++u) {
-		int c = (uint8_t)str[u];
-		c = seq_nt4_table[c];
-		memset(x[0][u], 0, 4 * sizeof(float));
-		memset(x[1][ulen - 1 - u], 0, 4 * sizeof(float));
-		if (c >= 4) continue;
-		x[0][u][c] = 1.0f;
-		x[1][ulen - 1 - u][3 - c] = 1.0f;
-	}
-	kann_eval(ua, KANN_F_OUT, 0);
-	cnt[0] = cnt[1] = cnt[2] = cnt[3] = 0;
-	for (u = 0; u < ulen; ++u) {
-		float *y = &out->x[u * 2];
-		int c = y[0] > y[1]? 0 : 1;
-		++cnt[c];
-		if (isupper(str[u]) && c == 0) ++cnt[3];
-		else if (islower(str[u]) && c == 1) ++cnt[2];
-		str[u] = c == 0? tolower(str[u]) : toupper(str[u]);
-	}
-}
-
-void dn_predict(kann_t *ann, int ulen, char *str)
-{
-	float **x[2];
+	float **x[2], *z;
 	kann_t *ua;
-	int i, u, len;
-	char *buf;
+	int step = ulen/2, n_lbl, l_seq, i, j, b, u, *st;
+	uint8_t *lbl;
+	kad_node_t *out;
 
-	buf = (char*)calloc(ulen + 1, 1);
+	n_lbl = dbr_get_n_lbl(ann);
+	l_seq = strlen(str);
+	lbl = (uint8_t*)calloc(l_seq, 1);
+	z = (float*)calloc(l_seq, sizeof(float));
+	st = (int*)calloc(mbs, sizeof(int));
+
 	x[0] = (float**)calloc(ulen, sizeof(float*));
 	x[1] = (float**)calloc(ulen, sizeof(float*));
 	for (u = 0; u < ulen; ++u) {
-		x[0][u] = (float*)calloc(4, sizeof(float));
-		x[1][u] = (float*)calloc(4, sizeof(float));
+		x[0][u] = (float*)calloc(4 * mbs, sizeof(float));
+		x[1][u] = (float*)calloc(4 * mbs, sizeof(float));
 	}
 
 	ua = kann_unroll(ann, ulen, ulen, ulen);
-	kann_set_batch_size(ua, 1);
+	kann_mt(ua, n_threads, mbs);
+	kann_set_batch_size(ua, mbs);
+	kann_switch(ua, 0);
 	kann_feed_bind(ua, KANN_F_IN, 1, x[0]);
 	kann_feed_bind(ua, KANN_F_IN, 2, x[1]);
-	len = strlen(str);
-	for (i = 0; i + ulen <= len; i += ulen/2) {
-		int cnt[4];
-		strncpy(buf, &str[i], ulen);
-		dn_predict1(ua, x, buf, cnt);
-		printf("%d\t%d\t%s\t%d\t%d\t%d\t%d\n", i, i+ulen, buf, cnt[0], cnt[1], cnt[2], cnt[3]);
+	out = ua->v[kann_find(ua, KANN_F_OUT, 0)];
+
+	for (i = b = 0; i < l_seq; i += step) {
+		for (j = i; j < l_seq && j < i + ulen; ++j) {
+			int c = seq_nt4_table[(uint8_t)str[j]];
+			int u = j - i;
+			if (c >= 4) continue;
+			x[0][u][b * 4 + c] = 1.0f;
+			x[1][ulen - 1 - u][b * 4 + (3 - c)] = 1.0f;
+		}
+		st[b++] = i;
+		if (b == mbs || i + step >= l_seq) {
+			int k;
+			kann_eval(ua, KANN_F_OUT, 0);
+			for (k = 0; k < b; ++k) {
+				for (j = st[k]; j < l_seq && j < st[k] + ulen; ++j) {
+					int u = j - st[k], a, max_a;
+					float *y = &out->x[(u * mbs + k) * n_lbl], max;
+					max_a = 0, max = y[0];
+					for (a = 1; a < n_lbl; ++a)
+						if (y[a] > max) max = y[a], max_a = a;
+					if (max > z[j]) z[j] = max, lbl[j] = max_a;
+				}
+			}
+			for (u = 0; u < ulen; ++u) {
+				memset(x[0][u], 0, 4 * mbs * sizeof(float));
+				memset(x[1][u], 0, 4 * mbs * sizeof(float));
+			}
+			b = 0;
+		}
 	}
 	kann_delete_unrolled(ua);
 
 	for (u = 0; u < ulen; ++u) { free(x[0][u]); free(x[1][u]); }
-	free(x[0]); free(x[1]); free(buf);
+	free(x[0]); free(x[1]); free(z); free(st);
+	return lbl;
 }
 
 int main(int argc, char *argv[])
 {
 	kann_t *ann = 0;
-	dn_seqs_t *dr;
-	int c, n_layer = 1, n_neuron = 128, ulen = 100, to_apply = 0;
+	int c, n_layer = 1, n_neuron = 128, ulen = 100, to_apply = 0, to_eval = 0;
 	int batch_len = 1000000, mbs = 64, m_epoch = 50, n_threads = 1, is_tied = 1;
 	float h_dropout = 0.0f, lr = 0.001f;
 	char *fn_out = 0, *fn_in = 0;
 	ketopt_t o = KETOPT_INIT;
 
-	while ((c = ketopt(&o, argc, argv, 1, "Au:l:n:m:B:o:i:t:Tb:", 0)) >= 0) {
+	while ((c = ketopt(&o, argc, argv, 1, "Au:l:n:m:B:o:i:t:Tb:E", 0)) >= 0) {
 		if (c == 'u') ulen = atoi(o.arg);
 		else if (c == 'l') n_layer = atoi(o.arg);
 		else if (c == 'n') n_neuron = atoi(o.arg);
@@ -189,6 +198,7 @@ int main(int argc, char *argv[])
 		else if (c == 'o') fn_out = o.arg;
 		else if (c == 'i') fn_in = o.arg;
 		else if (c == 'A') to_apply = 1;
+		else if (c == 'E') to_eval = 1;
 		else if (c == 't') n_threads = atoi(o.arg);
 		else if (c == 'T') is_tied = 0; // for debugging only; weights should be tiled for DNA sequences
 		else if (c == 'b') batch_len = atoi(o.arg);
@@ -198,13 +208,51 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	dr = dn_read(argv[o.ind]);
 	if (fn_in) ann = kann_load(fn_in);
 	if (!to_apply) {
+		dn_seqs_t *dr;
+		dr = dn_read(argv[o.ind]);
 		if (ann == 0) ann = dn_model_gen(dr->n_lbl, n_layer, n_neuron, h_dropout, is_tied);
-		dn_train(ann, dr, ulen, lr, m_epoch, mbs, n_threads, batch_len, fn_out);
+		dbr_train(ann, dr, ulen, lr, m_epoch, mbs, n_threads, batch_len, fn_out);
 	} else if (ann) {
-//		dn_predict(ann, ulen, dr->s.s);
+		gzFile fp;
+		kseq_t *ks;
+		int n_lbl, *cnt;
+		n_lbl = dbr_get_n_lbl(ann);
+		cnt = (int*)calloc(n_lbl * n_lbl, sizeof(int));
+		fp = strcmp(argv[o.ind], "-")? gzopen(argv[o.ind], "r") : gzdopen(0, "r");
+		ks = kseq_init(fp);
+		while (kseq_read(ks) >= 0) {
+			uint8_t *lbl;
+			int i;
+			lbl = dbr_predict(ann, ks->seq.s, ulen, mbs, n_threads);
+			if (to_eval && ks->qual.l > 0) {
+				for (i = 0; i < ks->seq.l; ++i) {
+					int c = ks->qual.s[i] - 33;
+					if (c < 0 || c >= n_lbl) continue;
+					++cnt[c * n_lbl + lbl[i]];
+				}
+			}
+			printf("@%s\n", ks->name.s);
+			puts(ks->seq.s);
+			printf("+\n");
+			for (i = 0; i < ks->seq.l; ++i) lbl[i] += 33;
+			fwrite(lbl, 1, ks->seq.l, stdout);
+			putchar('\n');
+			free(lbl);
+		}
+		kseq_destroy(ks);
+		gzclose(fp);
+		if (to_eval) {
+			int a, b;
+			for (a = 0; a < n_lbl; ++a) {
+				fprintf(stderr, "[M::%s] true label %d:", __func__, a);
+				for (b = 0; b < n_lbl; ++b)
+					fprintf(stderr, " %11d", cnt[a * n_lbl + b]);
+				fputc('\n', stderr);
+			}
+		}
+		free(cnt);
 	}
 	return 0;
 }
