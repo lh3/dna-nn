@@ -239,6 +239,13 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	fprintf(stderr, "[M::%s] command line: ", __func__);
+	for (c = 0; c < argc; ++c) {
+		if (c) fprintf(stderr, " ");
+		fprintf(stderr, "%s", argv[c]);
+	}
+	fputc('\n', stderr);
+
 	if (fn_in) ann = kann_load(fn_in);
 	if (!to_apply) {
 		dn_seqs_t *dr;
