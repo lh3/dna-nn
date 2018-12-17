@@ -9,6 +9,8 @@
 #include "kseq.h"
 KSEQ_DECLARE(gzFile)
 
+#define DBR_VERSION "r20"
+
 kann_t *dbr_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, int is_tied)
 {
 	kad_node_t *s[2], *t, *w, *b, *y, *par[256]; // for very unreasonably deep models, this may overflow
@@ -114,7 +116,7 @@ void dbr_train(kann_t *ann, dn_seqs_t *dr, int ulen, float lr, int m_epoch, int 
 	free(r); free(y); free(x[0]); free(x[1]);
 }
 
-uint8_t *dbr_predict(kann_t *ua, const char *str)
+uint8_t *dbr_predict(kann_t *ua, const char *str, int ovlp_len)
 {
 	float **x[2], *z;
 	int mbs = -1, ulen;
@@ -122,6 +124,7 @@ uint8_t *dbr_predict(kann_t *ua, const char *str)
 	uint8_t *lbl;
 	kad_node_t *out;
 
+	assert(ovlp_len >= 0);
 	out = ua->v[kann_find(ua, KANN_F_OUT, 0)];
 	assert(out->n_d == 2);
 	for (i = 0; i < ua->n; ++i)
@@ -133,7 +136,7 @@ uint8_t *dbr_predict(kann_t *ua, const char *str)
 	assert(out->d[0] % mbs == 0);
 	ulen = out->d[0] / mbs;
 	n_lbl = out->d[1];
-	step = ulen / 2;
+	step = ulen - (ovlp_len < ulen / 2? ovlp_len : ulen / 2);
 
 	x[0] = (float**)calloc(ulen, sizeof(float*));
 	x[1] = (float**)calloc(ulen, sizeof(float*));
@@ -187,13 +190,13 @@ uint8_t *dbr_predict(kann_t *ua, const char *str)
 int main(int argc, char *argv[])
 {
 	kann_t *ann = 0;
-	int c, n_layer = 1, n_neuron = 128, ulen = 100, to_apply = 0, to_eval = 0;
-	int batch_len = 1000000, mbs = 64, m_epoch = 50, n_threads = 1, is_tied = 1, seed = 11;
-	float h_dropout = 0.0f, lr = 0.001f;
+	int c, n_layer = 1, n_neuron = 128, ulen = 150, to_apply = 0, to_eval = 0;
+	int batch_len = 1000000, mbs = 64, m_epoch = 50, n_threads = 1, is_tied = 1, seed = 11, ovlp_len = 50;
+	float h_dropout = 0.25f, lr = 0.001f;
 	char *fn_out = 0, *fn_in = 0;
 	ketopt_t o = KETOPT_INIT;
 
-	while ((c = ketopt(&o, argc, argv, 1, "Au:l:n:m:B:o:i:t:Tb:Ed:s:", 0)) >= 0) {
+	while ((c = ketopt(&o, argc, argv, 1, "Au:l:n:m:B:o:i:t:Tb:Ed:s:O:", 0)) >= 0) {
 		if (c == 'u') ulen = atoi(o.arg);
 		else if (c == 'l') n_layer = atoi(o.arg);
 		else if (c == 'n') n_neuron = atoi(o.arg);
@@ -207,6 +210,7 @@ int main(int argc, char *argv[])
 		else if (c == 'A') to_apply = 1;
 		else if (c == 'E') to_eval = to_apply = 1;
 		else if (c == 't') n_threads = atoi(o.arg);
+		else if (c == 'O') ovlp_len = atoi(o.arg);
 		else if (c == 'T') is_tied = 0; // for debugging only; weights should be tiled for DNA sequences
 		else if (c == 'b') {
 			double x;
@@ -227,8 +231,6 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "    -u INT     window length [%d]\n", ulen);
 		fprintf(stderr, "    -B INT     mini-batch size [%d]\n", mbs);
 		fprintf(stderr, "    -t INT     number of threads [%d]\n", n_threads);
-		fprintf(stderr, "    -A         apply a trained model (req. -i)\n");
-		fprintf(stderr, "    -E         apply and evaluate a trained model (req. -i)\n");
 		fprintf(stderr, "  Model construction:\n");
 		fprintf(stderr, "    -l INT     number of GRU layers [%d]\n", n_layer);
 		fprintf(stderr, "    -n INT     number of hidden neurons [%d]\n", n_neuron);
@@ -236,12 +238,17 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "  Training:\n");
 		fprintf(stderr, "    -r FLOAT   learning rate [%g]\n", lr);
 		fprintf(stderr, "    -m INT     number of epochs [%d]\n", m_epoch);
-		fprintf(stderr, "    -b INT     batch size [%d]\n", batch_len);
+		fprintf(stderr, "    -b INT     number of bases to train per epoch [%d]\n", batch_len);
 		fprintf(stderr, "    -s INT     PRNG seed [%d]\n", seed);
+		fprintf(stderr, "  Prediction:\n");
+		fprintf(stderr, "    -A         predict using a trained model (req. -i)\n");
+		fprintf(stderr, "    -E         predict and evaluate a trained model (req. -i)\n");
+		fprintf(stderr, "    -O INT     segment overlap length [%d]\n", ovlp_len);
 		return 1;
 	}
 
-	fprintf(stderr, "[M::%s] command line: ", __func__);
+	fprintf(stderr, "[M::%s] Version: %s\n", __func__, DBR_VERSION);
+	fprintf(stderr, "[M::%s] CMD: ", __func__);
 	for (c = 0; c < argc; ++c) {
 		if (c) fprintf(stderr, " ");
 		fprintf(stderr, "%s", argv[c]);
@@ -272,7 +279,7 @@ int main(int argc, char *argv[])
 		while (kseq_read(ks) >= 0) {
 			uint8_t *lbl;
 			int i;
-			lbl = dbr_predict(ua, ks->seq.s);
+			lbl = dbr_predict(ua, ks->seq.s, ovlp_len);
 			if (to_eval && ks->qual.l > 0) {
 				for (i = 0; i < ks->seq.l; ++i) {
 					int c = ks->qual.s[i] - 33;
