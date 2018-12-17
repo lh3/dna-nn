@@ -114,19 +114,26 @@ void dbr_train(kann_t *ann, dn_seqs_t *dr, int ulen, float lr, int m_epoch, int 
 	free(r); free(y); free(x[0]); free(x[1]);
 }
 
-uint8_t *dbr_predict(kann_t *ann, const char *str, int ulen, int mbs, int n_threads)
+uint8_t *dbr_predict(kann_t *ua, const char *str)
 {
 	float **x[2], *z;
-	kann_t *ua;
-	int step = ulen/2, n_lbl, l_seq, i, j, b, u, *st;
+	int mbs = -1, ulen;
+	int step, n_lbl, l_seq, i, j, b, u, *st;
 	uint8_t *lbl;
 	kad_node_t *out;
 
-	n_lbl = dbr_get_n_lbl(ann);
-	l_seq = strlen(str);
-	lbl = (uint8_t*)calloc(l_seq, 1);
-	z = (float*)calloc(l_seq, sizeof(float));
-	st = (int*)calloc(mbs, sizeof(int));
+	out = ua->v[kann_find(ua, KANN_F_OUT, 0)];
+	assert(out->n_d == 2);
+	for (i = 0; i < ua->n; ++i)
+		if (ua->v[i]->ext_flag & KANN_F_IN) {
+			mbs = ua->v[i]->d[0];
+			break;
+		}
+	assert(mbs > 0);
+	assert(out->d[0] % mbs == 0);
+	ulen = out->d[0] / mbs;
+	n_lbl = out->d[1];
+	step = ulen / 2;
 
 	x[0] = (float**)calloc(ulen, sizeof(float*));
 	x[1] = (float**)calloc(ulen, sizeof(float*));
@@ -134,14 +141,13 @@ uint8_t *dbr_predict(kann_t *ann, const char *str, int ulen, int mbs, int n_thre
 		x[0][u] = (float*)calloc(4 * mbs, sizeof(float));
 		x[1][u] = (float*)calloc(4 * mbs, sizeof(float));
 	}
-
-	ua = kann_unroll(ann, ulen, ulen, ulen);
-	kann_mt(ua, n_threads, mbs);
-	kann_set_batch_size(ua, mbs);
-	kann_switch(ua, 0);
 	kann_feed_bind(ua, KANN_F_IN, 1, x[0]);
 	kann_feed_bind(ua, KANN_F_IN, 2, x[1]);
-	out = ua->v[kann_find(ua, KANN_F_OUT, 0)];
+
+	l_seq = strlen(str);
+	lbl = (uint8_t*)calloc(l_seq, 1);
+	z = (float*)calloc(l_seq, sizeof(float));
+	st = (int*)calloc(mbs, sizeof(int));
 
 	for (i = b = 0; i < l_seq; i += step) {
 		for (j = i; j < l_seq && j < i + ulen; ++j) {
@@ -172,7 +178,6 @@ uint8_t *dbr_predict(kann_t *ann, const char *str, int ulen, int mbs, int n_thre
 			b = 0;
 		}
 	}
-	kann_delete_unrolled(ua);
 
 	for (u = 0; u < ulen; ++u) { free(x[0][u]); free(x[1][u]); }
 	free(x[0]); free(x[1]); free(z); free(st);
@@ -218,14 +223,20 @@ int main(int argc, char *argv[])
 		gzFile fp;
 		kseq_t *ks;
 		int n_lbl, *cnt;
+		kann_t *ua;
+
 		n_lbl = dbr_get_n_lbl(ann);
 		cnt = (int*)calloc(n_lbl * n_lbl, sizeof(int));
 		fp = strcmp(argv[o.ind], "-")? gzopen(argv[o.ind], "r") : gzdopen(0, "r");
 		ks = kseq_init(fp);
+
+		ua = kann_unroll(ann, ulen, ulen, ulen);
+		kann_set_batch_size(ua, mbs);
+		kann_switch(ua, 0);
 		while (kseq_read(ks) >= 0) {
 			uint8_t *lbl;
 			int i;
-			lbl = dbr_predict(ann, ks->seq.s, ulen, mbs, n_threads);
+			lbl = dbr_predict(ua, ks->seq.s);
 			if (to_eval && ks->qual.l > 0) {
 				for (i = 0; i < ks->seq.l; ++i) {
 					int c = ks->qual.s[i] - 33;
@@ -241,8 +252,11 @@ int main(int argc, char *argv[])
 			putchar('\n');
 			free(lbl);
 		}
+		kann_delete_unrolled(ua);
+
 		kseq_destroy(ks);
 		gzclose(fp);
+
 		if (to_eval) {
 			int a, b;
 			for (a = 0; a < n_lbl; ++a) {
