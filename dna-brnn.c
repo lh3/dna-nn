@@ -188,16 +188,17 @@ int main(int argc, char *argv[])
 {
 	kann_t *ann = 0;
 	int c, n_layer = 1, n_neuron = 128, ulen = 100, to_apply = 0, to_eval = 0;
-	int batch_len = 1000000, mbs = 64, m_epoch = 50, n_threads = 1, is_tied = 1;
+	int batch_len = 1000000, mbs = 64, m_epoch = 50, n_threads = 1, is_tied = 1, seed = 11;
 	float h_dropout = 0.0f, lr = 0.001f;
 	char *fn_out = 0, *fn_in = 0;
 	ketopt_t o = KETOPT_INIT;
 
-	while ((c = ketopt(&o, argc, argv, 1, "Au:l:n:m:B:o:i:t:Tb:Ed:", 0)) >= 0) {
+	while ((c = ketopt(&o, argc, argv, 1, "Au:l:n:m:B:o:i:t:Tb:Ed:s:", 0)) >= 0) {
 		if (c == 'u') ulen = atoi(o.arg);
 		else if (c == 'l') n_layer = atoi(o.arg);
 		else if (c == 'n') n_neuron = atoi(o.arg);
 		else if (c == 'r') lr = atof(o.arg);
+		else if (c == 's') seed = atoi(o.arg);
 		else if (c == 'm') m_epoch = atoi(o.arg);
 		else if (c == 'd') h_dropout = atof(o.arg);
 		else if (c == 'B') mbs = atoi(o.arg);
@@ -236,6 +237,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "    -r FLOAT   learning rate [%g]\n", lr);
 		fprintf(stderr, "    -m INT     number of epochs [%d]\n", m_epoch);
 		fprintf(stderr, "    -b INT     batch size [%d]\n", batch_len);
+		fprintf(stderr, "    -s INT     PRNG seed [%d]\n", seed);
 		return 1;
 	}
 
