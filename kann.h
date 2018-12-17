@@ -132,6 +132,7 @@ int kann_feed_bind(kann_t *a, uint32_t ext_flag, int32_t ext_label, float **x);
 float kann_cost(kann_t *a, int cost_label, int cal_grad);
 
 int kann_eval(kann_t *a, uint32_t ext_flag, int ext_label);
+int kann_eval_out(kann_t *a);
 int kann_class_error(const kann_t *ann, int *base);
 
 /**

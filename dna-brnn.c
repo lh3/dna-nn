@@ -160,7 +160,7 @@ uint8_t *dbr_predict(kann_t *ua, const char *str)
 		st[b++] = i;
 		if (b == mbs || i + step >= l_seq) {
 			int k;
-			kann_eval(ua, KANN_F_OUT, 0);
+			kann_eval_out(ua);
 			for (k = 0; k < b; ++k) {
 				for (j = st[k]; j < l_seq && j < st[k] + ulen; ++j) {
 					int u = j - st[k], a, max_a;
@@ -231,6 +231,7 @@ int main(int argc, char *argv[])
 		ks = kseq_init(fp);
 
 		ua = kann_unroll(ann, ulen, ulen, ulen);
+		kann_mt(ua, n_threads, mbs);
 		kann_set_batch_size(ua, mbs);
 		kann_switch(ua, 0);
 		while (kseq_read(ks) >= 0) {
