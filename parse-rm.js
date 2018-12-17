@@ -47,6 +47,7 @@ while (file.readline(buf) >= 0) {
 		else if (m[4] == "ALR/Alpha") type = "3";
 		else if (m[4] == "BSR/Beta" || m[4] == "LSAU") type = "4";
 		else if (m[4] == "HSATII") type = "2";
+		else if (m[5] == "LINE/L1") type = "5";
 		else if ((m[5] == "Simple_repeat" || m[5] == "Satellite") && ((m4 = /^\(([ACGT]+)\)n/.exec(m[4])) != null)) {
 			if (motif_hash[m4[1]] != null) {
 				type = "2";

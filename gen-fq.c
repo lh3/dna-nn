@@ -92,13 +92,13 @@ int main(int argc, char *argv[])
 	reghash_t *h;
 	gzFile fp;
 	kseq_t *ks;
-	int c;
+	int c, max_lbl = 93;
 	uint64_t n_ovlp = 0;
 
-	while ((c = ketopt(&o, argc, argv, 1, "", 0)) >= 0) {
-	}
+	while ((c = ketopt(&o, argc, argv, 1, "m:", 0)) >= 0)
+		if (c == 'm') max_lbl = atoi(o.arg);
 	if (argc - o.ind < 2) {
-		fprintf(stderr, "Usage: gen-fq <in.fa> <in.bed>\n");
+		fprintf(stderr, "Usage: gen-fq [-m maxLbl] <in.fa> <in.bed>\n");
 		return 1;
 	}
 
@@ -118,11 +118,13 @@ int main(int argc, char *argv[])
 		if (k != kh_end(h)) {
 			reglist_t *p = &kh_val(h, k);
 			int i, j;
-			for (i = 0; i < p->n; ++i)
+			for (i = 0; i < p->n; ++i) {
+				if (p->a[i].x > max_lbl) continue;
 				for (j = p->a[i].st; j < p->a[i].en; ++j) {
 					if (ks->qual.s[j] != 33) ++n_ovlp;
 					ks->qual.s[j] = p->a[i].x + 33;
 				}
+			}
 		}
 		printf("@%s\n", ks->name.s);
 		puts(ks->seq.s);
