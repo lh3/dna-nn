@@ -9,7 +9,7 @@
 #include "kseq.h"
 KSEQ_DECLARE(gzFile)
 
-kann_t *dn_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, int is_tied)
+kann_t *dbr_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, int is_tied)
 {
 	kad_node_t *s[2], *t, *w, *b, *y, *par[256]; // for very unreasonably deep models, this may overflow
 	int i, k, offset;
@@ -193,23 +193,49 @@ int main(int argc, char *argv[])
 	char *fn_out = 0, *fn_in = 0;
 	ketopt_t o = KETOPT_INIT;
 
-	while ((c = ketopt(&o, argc, argv, 1, "Au:l:n:m:B:o:i:t:Tb:E", 0)) >= 0) {
+	while ((c = ketopt(&o, argc, argv, 1, "Au:l:n:m:B:o:i:t:Tb:Ed:", 0)) >= 0) {
 		if (c == 'u') ulen = atoi(o.arg);
 		else if (c == 'l') n_layer = atoi(o.arg);
 		else if (c == 'n') n_neuron = atoi(o.arg);
 		else if (c == 'r') lr = atof(o.arg);
 		else if (c == 'm') m_epoch = atoi(o.arg);
+		else if (c == 'd') h_dropout = atof(o.arg);
 		else if (c == 'B') mbs = atoi(o.arg);
 		else if (c == 'o') fn_out = o.arg;
 		else if (c == 'i') fn_in = o.arg;
 		else if (c == 'A') to_apply = 1;
-		else if (c == 'E') to_eval = 1;
+		else if (c == 'E') to_eval = to_apply = 1;
 		else if (c == 't') n_threads = atoi(o.arg);
 		else if (c == 'T') is_tied = 0; // for debugging only; weights should be tiled for DNA sequences
-		else if (c == 'b') batch_len = atoi(o.arg);
+		else if (c == 'b') {
+			double x;
+			char *s;
+			x = strtod(o.arg, &s);
+			if (*s == 'g' || *s == 'G') x *= 1e9;
+			else if (*s == 'm' || *s == 'M') x *= 1e6;
+			else if (*s == 'k' || *s == 'K') x *= 1e3;
+			batch_len = (int)(x + .499);
+		}
 	}
 	if (argc - o.ind < 1) {
-		fprintf(stderr, "Usage: dna-brnn [options] <seq.txt>\n");
+		fprintf(stderr, "Usage: dna-brnn [options] <seq.fq>\n");
+		fprintf(stderr, "Options:\n");
+		fprintf(stderr, "  General:\n");
+		fprintf(stderr, "    -i FILE    read a trained model from FILE []\n");
+		fprintf(stderr, "    -o FILE    write model to FILE []\n");
+		fprintf(stderr, "    -u INT     window length [%d]\n", ulen);
+		fprintf(stderr, "    -B INT     mini-batch size [%d]\n", mbs);
+		fprintf(stderr, "    -t INT     number of threads [%d]\n", n_threads);
+		fprintf(stderr, "    -A         apply a trained model (req. -i)\n");
+		fprintf(stderr, "    -E         apply and evaluate a trained model (req. -i)\n");
+		fprintf(stderr, "  Model construction:\n");
+		fprintf(stderr, "    -l INT     number of GRU layers [%d]\n", n_layer);
+		fprintf(stderr, "    -n INT     number of hidden neurons [%d]\n", n_neuron);
+		fprintf(stderr, "    -d FLOAT   dropout rate [%g]\n", h_dropout);
+		fprintf(stderr, "  Training:\n");
+		fprintf(stderr, "    -r FLOAT   learning rate [%g]\n", lr);
+		fprintf(stderr, "    -m INT     number of epochs [%d]\n", m_epoch);
+		fprintf(stderr, "    -b INT     batch size [%d]\n", batch_len);
 		return 1;
 	}
 
@@ -217,7 +243,7 @@ int main(int argc, char *argv[])
 	if (!to_apply) {
 		dn_seqs_t *dr;
 		dr = dn_read(argv[o.ind]);
-		if (ann == 0) ann = dn_model_gen(dr->n_lbl, n_layer, n_neuron, h_dropout, is_tied);
+		if (ann == 0) ann = dbr_model_gen(dr->n_lbl, n_layer, n_neuron, h_dropout, is_tied);
 		dbr_train(ann, dr, ulen, lr, m_epoch, mbs, n_threads, batch_len, fn_out);
 	} else if (ann) {
 		gzFile fp;

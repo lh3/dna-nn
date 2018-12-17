@@ -104,8 +104,6 @@ kann_t *kann_clone(kann_t *a, int batch_size)
 kann_t *kann_unroll_array(kann_t *a, int *len)
 {
 	kann_t *b;
-	int n_pivots;
-	n_pivots = kad_n_pivots(a->n, a->v);
 	b = (kann_t*)calloc(1, sizeof(kann_t));
 	b->x = a->x, b->g = a->g, b->c = a->c; /* these arrays are shared */
 	b->v = kad_unroll(a->n, a->v, &b->n, len);

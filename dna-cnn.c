@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
 {
 	int seed = 11, ws = 100, n_flt = 32, k_size = 17, n_h_neurons = 64, max_epoch = 100, mb_size = 64, chunk_size = 50000000, n_threads = 1;
 	int c, to_apply = 0, n_lbl = 0;
-	float h_dropout = 0.1f, lr = 0.001f;
+	float lr = 0.001f;
 	kann_t *ann = 0;
 	char *fn_in = 0, *fn_out = 0;
 	dn_seqs_t *s = 0;
@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "%s", argv[c]);
 	}
 	fputc('\n', stderr);
-	while ((c = ketopt(&o, argc, argv, 1, "n:s:r:m:B:o:i:d:k:f:w:Ac:t:", 0)) >= 0) {
+	while ((c = ketopt(&o, argc, argv, 1, "n:s:r:m:B:o:i:k:f:w:Ac:t:", 0)) >= 0) {
 		if (c == 'n') n_h_neurons = atoi(o.arg);
 		else if (c == 's') seed = atoi(o.arg);
 		else if (c == 'i') fn_in = o.arg;
@@ -116,7 +116,6 @@ int main(int argc, char *argv[])
 		else if (c == 'r') lr = atof(o.arg);
 		else if (c == 'm') max_epoch = atoi(o.arg);
 		else if (c == 'B') mb_size = atoi(o.arg);
-		else if (c == 'd') h_dropout = atof(o.arg);
 		else if (c == 'k') k_size = atoi(o.arg);
 		else if (c == 'A') to_apply = 1;
 		else if (c == 't') n_threads = atoi(o.arg);
