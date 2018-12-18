@@ -39,14 +39,21 @@ var buf = new Bytes();
 
 while (file.readline(buf) >= 0) {
 	var m, m4, line = buf.toString();
+	var ctg = null, st = -1, en = -1, rep = null, fam = null;
 	if ((m = /^\s*\d+\s+\S+\s+\S+\s+\S+\s+(\S+)\s+(\d+)\s+(\d+)\s+\S+\s+[+C]\s+(\S+)\s+(\S+)/.exec(line)) != null) {
+		ctg = m[1], st = parseInt(m[2]) - 1, en = m[3], rep = m[4], fam = m[5];
+	} else if ((m = /^\d+(\t\d+){4}\t(\S+)\t(\d+)\t(\d+)\t\S+\t[+-]\t(\S+)\t(\S+)\t(\S+)/.exec(line)) != null) {
+		ctg = m[2], st = m[3], en = m[4], rep = m[5];
+		fam = m[6] == m[7]? m[6] : m[6] + '/' + m[7];
+	}
+	if (ctg != null) {
 		var type = null;
-		if (m[5] == "SINE/Alu") type = "3";
-		else if (m[4] == "ALR/Alpha") type = "2";
-		else if (m[4] == "BSR/Beta" || m[4] == "LSAU") type = "4";
-		else if (m[4] == "HSATII") type = "1";
-		else if (m[5] == "LINE/L1") type = "5";
-		else if ((m[5] == "Simple_repeat" || m[5] == "Satellite") && ((m4 = /^\(([ACGT]+)\)n/.exec(m[4])) != null)) {
+		if (fam == "SINE/Alu") type = "3";
+		else if (rep == "ALR/Alpha") type = "2";
+		else if (rep == "BSR/Beta" || rep == "LSAU") type = "4";
+		else if (rep == "HSATII") type = "1";
+		else if (fam == "LINE/L1") type = "5";
+		else if ((fam == "Simple_repeat" || fam == "Satellite") && ((m4 = /^\(([ACGT]+)\)n/.exec(rep)) != null)) {
 			if (motif_hash[m4[1]] != null) {
 				type = "1";
 			} else if (m4[1].length % motif0.length == 0) {
@@ -58,7 +65,7 @@ while (file.readline(buf) >= 0) {
 					type = "1";
 			}
 		}
-		if (type != null) print(m[1], parseInt(m[2]) - 1, m[3], type, m[4], m[5]);
+		if (type != null) print(ctg, st, en, type, rep, fam);
 	}
 }
 
