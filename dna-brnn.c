@@ -9,7 +9,7 @@
 #include "kseq.h"
 KSEQ_DECLARE(gzFile)
 
-#define DBR_VERSION "r24"
+#define DBR_VERSION "r25"
 
 kann_t *dbr_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, int is_tied)
 {
@@ -303,6 +303,7 @@ int main(int argc, char *argv[])
 			free(lbl);
 		}
 		kann_delete_unrolled(ua);
+		kann_delete(ann);
 
 		kseq_destroy(ks);
 		gzclose(fp);
