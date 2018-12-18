@@ -9,7 +9,7 @@
 #include "kseq.h"
 KSEQ_DECLARE(gzFile)
 
-#define DBR_VERSION "r23"
+#define DBR_VERSION "r24"
 
 kann_t *dbr_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, int is_tied)
 {
@@ -185,8 +185,8 @@ uint8_t *dbr_predict(kann_t *ua, const char *str, int ovlp_len)
 int main(int argc, char *argv[])
 {
 	kann_t *ann = 0;
-	int c, n_layer = 1, n_neuron = 128, ulen = 150, to_apply = 0, to_eval = 0, out_fq = 0;
-	int batch_len = 1000000, mbs = 64, m_epoch = 50, n_threads = 1, is_tied = 1, seed = 11, ovlp_len = 50;
+	int c, n_layer = 1, n_neuron = 64, ulen = 150, to_apply = 0, to_eval = 0, out_fq = 0;
+	int batch_len = 10000000, mbs = 64, m_epoch = 25, n_threads = 1, is_tied = 1, seed = 11, ovlp_len = 50;
 	float h_dropout = 0.25f, lr = 0.001f;
 	char *fn_out = 0, *fn_in = 0;
 	ketopt_t o = KETOPT_INIT;
