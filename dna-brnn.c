@@ -9,7 +9,7 @@
 #include "kseq.h"
 KSEQ_DECLARE(gzFile)
 
-#define DBR_VERSION "r25"
+#define DBR_VERSION "r27"
 
 kann_t *dbr_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, int is_tied)
 {
@@ -242,6 +242,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "    -O INT     segment overlap length [%d]\n", ovlp_len);
 		return 1;
 	}
+	kann_srand(seed);
 
 	fprintf(stderr, "[M::%s] Version: %s\n", __func__, DBR_VERSION);
 	fprintf(stderr, "[M::%s] CMD: ", __func__);
