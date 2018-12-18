@@ -9,7 +9,7 @@
 #include "kseq.h"
 KSEQ_DECLARE(gzFile)
 
-#define DBR_VERSION "r20"
+#define DBR_VERSION "r23"
 
 kann_t *dbr_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, int is_tied)
 {
@@ -127,12 +127,7 @@ uint8_t *dbr_predict(kann_t *ua, const char *str, int ovlp_len)
 	assert(ovlp_len >= 0);
 	out = ua->v[kann_find(ua, KANN_F_OUT, 0)];
 	assert(out->n_d == 2);
-	for (i = 0; i < ua->n; ++i)
-		if (ua->v[i]->ext_flag & KANN_F_IN) {
-			mbs = ua->v[i]->d[0];
-			break;
-		}
-	assert(mbs > 0);
+	mbs = kad_sync_dim(ua->n, ua->v, -1);
 	assert(out->d[0] % mbs == 0);
 	ulen = out->d[0] / mbs;
 	n_lbl = out->d[1];
@@ -190,13 +185,13 @@ uint8_t *dbr_predict(kann_t *ua, const char *str, int ovlp_len)
 int main(int argc, char *argv[])
 {
 	kann_t *ann = 0;
-	int c, n_layer = 1, n_neuron = 128, ulen = 150, to_apply = 0, to_eval = 0;
+	int c, n_layer = 1, n_neuron = 128, ulen = 150, to_apply = 0, to_eval = 0, out_fq = 0;
 	int batch_len = 1000000, mbs = 64, m_epoch = 50, n_threads = 1, is_tied = 1, seed = 11, ovlp_len = 50;
 	float h_dropout = 0.25f, lr = 0.001f;
 	char *fn_out = 0, *fn_in = 0;
 	ketopt_t o = KETOPT_INIT;
 
-	while ((c = ketopt(&o, argc, argv, 1, "Au:l:n:m:B:o:i:t:Tb:Ed:s:O:", 0)) >= 0) {
+	while ((c = ketopt(&o, argc, argv, 1, "Au:l:n:m:B:o:i:t:Tb:Ed:s:O:S", 0)) >= 0) {
 		if (c == 'u') ulen = atoi(o.arg);
 		else if (c == 'l') n_layer = atoi(o.arg);
 		else if (c == 'n') n_neuron = atoi(o.arg);
@@ -211,6 +206,7 @@ int main(int argc, char *argv[])
 		else if (c == 'E') to_eval = to_apply = 1;
 		else if (c == 't') n_threads = atoi(o.arg);
 		else if (c == 'O') ovlp_len = atoi(o.arg);
+		else if (c == 'S') out_fq = 1;
 		else if (c == 'T') is_tied = 0; // for debugging only; weights should be tiled for DNA sequences
 		else if (c == 'b') {
 			double x;
@@ -287,12 +283,23 @@ int main(int argc, char *argv[])
 					++cnt[c * n_lbl + lbl[i]];
 				}
 			}
-			printf("@%s\n", ks->name.s);
-			puts(ks->seq.s);
-			printf("+\n");
-			for (i = 0; i < ks->seq.l; ++i) lbl[i] += 33;
-			fwrite(lbl, 1, ks->seq.l, stdout);
-			putchar('\n');
+			if (out_fq) {
+				printf("@%s\n", ks->name.s);
+				puts(ks->seq.s);
+				printf("+\n");
+				for (i = 0; i < ks->seq.l; ++i) lbl[i] += 33;
+				fwrite(lbl, 1, ks->seq.l, stdout);
+				putchar('\n');
+			} else {
+				int st = 0, x = 0;
+				for (i = 0; i <= ks->seq.l; ++i) {
+					if (i == ks->seq.l || lbl[i] == 0) {
+						if (x > 0) printf("%s\t%d\t%d\t%d\n", ks->name.s, st, i, x);
+						if (i == ks->seq.l) break;
+						st = x = 0;
+					} else if (x == 0) st = i, x = lbl[i];
+				}
+			}
 			free(lbl);
 		}
 		kann_delete_unrolled(ua);
