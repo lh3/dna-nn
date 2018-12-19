@@ -9,9 +9,9 @@
 #include "kseq.h"
 KSEQ_DECLARE(gzFile)
 
-#define DBR_VERSION "r27"
+#define DBR_VERSION "r28"
 
-kann_t *dbr_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, int is_tied)
+kann_t *dbr_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, float w0, int is_tied)
 {
 	kad_node_t *s[2], *t, *w, *b, *y, *par[256]; // for very unreasonably deep models, this may overflow
 	int i, k, offset;
@@ -36,7 +36,12 @@ kann_t *dbr_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, int
 	t = kad_softmax(kad_add(kad_cmul(t, w), b)), t->ext_flag = KANN_F_OUT;
 	y = kad_feed(2, 1, n_lbl), y->ext_flag = KANN_F_TRUTH;
 	y = kad_stack(1, &y); // third pivot
-	t = kad_ce_multi(t, y), t->ext_flag = KANN_F_COST;
+	if (w0 > 1.0f) {
+		b = kann_new_leaf(KAD_CONST, 1.0f, 1, n_lbl);
+		b->x[0] = w0;
+		t = kad_ce_multi_weighted(t, y, b);
+	} else t = kad_ce_multi(t, y);
+	t->ext_flag = KANN_F_COST;
 	return kann_new(t, 0);
 }
 
@@ -187,11 +192,11 @@ int main(int argc, char *argv[])
 	kann_t *ann = 0;
 	int c, n_layer = 1, n_neuron = 64, ulen = 150, to_apply = 0, to_eval = 0, out_fq = 0;
 	int batch_len = 10000000, mbs = 64, m_epoch = 25, n_threads = 1, is_tied = 1, seed = 11, ovlp_len = 50;
-	float h_dropout = 0.25f, lr = 0.001f;
+	float h_dropout = 0.25f, lr = 0.001f, w0 = 3.0f;
 	char *fn_out = 0, *fn_in = 0;
 	ketopt_t o = KETOPT_INIT;
 
-	while ((c = ketopt(&o, argc, argv, 1, "Au:l:n:m:B:o:i:t:Tb:Ed:s:O:S", 0)) >= 0) {
+	while ((c = ketopt(&o, argc, argv, 1, "Au:l:n:m:B:o:i:t:Tb:Ed:s:O:Sw:", 0)) >= 0) {
 		if (c == 'u') ulen = atoi(o.arg);
 		else if (c == 'l') n_layer = atoi(o.arg);
 		else if (c == 'n') n_neuron = atoi(o.arg);
@@ -207,6 +212,7 @@ int main(int argc, char *argv[])
 		else if (c == 't') n_threads = atoi(o.arg);
 		else if (c == 'O') ovlp_len = atoi(o.arg);
 		else if (c == 'S') out_fq = 1;
+		else if (c == 'w') w0 = atof(o.arg);
 		else if (c == 'T') is_tied = 0; // for debugging only; weights should be tiled for DNA sequences
 		else if (c == 'b') {
 			double x;
@@ -231,6 +237,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "    -l INT     number of GRU layers [%d]\n", n_layer);
 		fprintf(stderr, "    -n INT     number of hidden neurons [%d]\n", n_neuron);
 		fprintf(stderr, "    -d FLOAT   dropout rate [%g]\n", h_dropout);
+		fprintf(stderr, "    -w FLOAT   weight on false positive errors [%g]\n", w0);
 		fprintf(stderr, "  Training:\n");
 		fprintf(stderr, "    -r FLOAT   learning rate [%g]\n", lr);
 		fprintf(stderr, "    -m INT     number of epochs [%d]\n", m_epoch);
@@ -256,7 +263,7 @@ int main(int argc, char *argv[])
 	if (!to_apply) {
 		dn_seqs_t *dr;
 		dr = dn_read(argv[o.ind]);
-		if (ann == 0) ann = dbr_model_gen(dr->n_lbl, n_layer, n_neuron, h_dropout, is_tied);
+		if (ann == 0) ann = dbr_model_gen(dr->n_lbl, n_layer, n_neuron, h_dropout, w0, is_tied);
 		dbr_train(ann, dr, ulen, lr, m_epoch, mbs, n_threads, batch_len, fn_out);
 	} else if (ann) {
 		gzFile fp;

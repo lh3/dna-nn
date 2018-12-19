@@ -229,7 +229,7 @@ static int kann_class_error_core(const kann_t *ann, int *base)
 	int i, j, k, m, n, off, n_err = 0;
 	for (i = 0, *base = 0; i < ann->n; ++i) {
 		kad_node_t *p = ann->v[i];
-		if ((p->op == 13 || p->op == 22) && p->n_child == 2 && p->n_d == 0) { /* ce_bin or ce_multi */
+		if (((p->op == 13 && (p->n_child == 2 || p->n_child == 3)) || (p->op == 22 && p->n_child == 2)) && p->n_d == 0) { /* ce_bin or ce_multi */
 			kad_node_t *x = p->child[0], *t = p->child[1];
 			n = t->d[t->n_d - 1], m = kad_len(t) / n;
 			for (j = off = 0; j < m; ++j, off += n) {
