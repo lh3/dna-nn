@@ -9,7 +9,7 @@
 #include "kseq.h"
 KSEQ_DECLARE(gzFile)
 
-#define DBR_VERSION "r29"
+#define DBR_VERSION "r30"
 
 kann_t *dbr_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, float w0, int is_tied)
 {
@@ -30,8 +30,7 @@ kann_t *dbr_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, flo
 		s[k] = kad_stack(1, &s[k]); // first and second pivot
 	}
 	s[1] = kad_reverse(s[1], 0);
-	t = kad_concat(2, 2, s[0], s[1]), w = kann_new_weight(n_lbl, n_neuron * 2);
-//	t = kad_avg(2, s), w= kann_new_weight(2, n_neuron);
+	t = kad_avg(2, s), t->flag &= ~KAD_POOL, w= kann_new_weight(n_lbl, n_neuron);
 	b = kann_new_bias(n_lbl);
 	t = kad_softmax(kad_add(kad_cmul(t, w), b)), t->ext_flag = KANN_F_OUT;
 	y = kad_feed(2, 1, n_lbl), y->ext_flag = KANN_F_TRUTH;
