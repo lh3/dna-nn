@@ -1,4 +1,5 @@
 #include <zlib.h>
+#include <math.h>
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,10 +7,11 @@
 #include "ketopt.h"
 #include "dna-io.h"
 #include "kann.h"
+#include "mss.h"
 #include "kseq.h"
 KSEQ_DECLARE(gzFile)
 
-#define DBR_VERSION "r30"
+#define DBR_VERSION "r31"
 
 kann_t *dbr_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, float w0, int is_tied)
 {
@@ -120,7 +122,41 @@ void dbr_train(kann_t *ann, dn_seqs_t *dr, int ulen, float lr, int m_epoch, int 
 	free(r); free(y); free(x[0]); free(x[1]);
 }
 
-uint8_t *dbr_predict(kann_t *ua, const char *str, int ovlp_len)
+void dbr_predict_mss(int l, uint8_t *lbl, float *z, int min_mss_len)
+{
+	const double sig_cap = 0.99, large = -1e3;
+	msseg_t *segs;
+	double *s, min_sc;
+	int i, k, n_segs, st;
+	min_sc = log(sig_cap / (1.0 - sig_cap)) * min_mss_len;
+	s = (double*)calloc(l, sizeof(double));
+	for (i = 0; i < l; ++i) {
+		if (lbl[i] == 0)
+			s[i] = z[i] > sig_cap? large : -log(z[i] / (1.0 - z[i]));
+		else
+			s[i] = log(z[i] < sig_cap? z[i] / (1.0 - z[i]) : sig_cap / (1.0 - sig_cap));
+		//fprintf(stderr, "%d\t%d\t%g\t%g\n", i, lbl[i], z[i], s[i]);
+	}
+	segs = mss_find_all(l, s, min_sc, &n_segs);
+	for (k = 0, st = 0; k < n_segs; ++k) {
+		int cnt[128], max_lbl = -1, max_cnt = 0;
+		memset(cnt, 0, sizeof(int) * 128);
+		for (i = segs[k].st; i < segs[k].en; ++i)
+			++cnt[lbl[i]];
+		max_lbl = 1, max_cnt = cnt[1];
+		for (i = 2; i < 128; ++i)
+			if (max_cnt < cnt[i]) max_cnt = cnt[i], max_lbl = i;
+		for (i = segs[k].st; i < segs[k].en; ++i)
+			if (lbl[i] == 0) lbl[i] = max_lbl;
+		for (i = st; i < segs[k].st; ++i) lbl[i] = 0;
+		st = segs[k].en;
+	}
+	for (i = st; i < l; ++i) lbl[i] = 0;
+	free(segs);
+	free(s);
+}
+
+uint8_t *dbr_predict(kann_t *ua, const char *str, int ovlp_len, int min_mss_len)
 {
 	float **x[2], *z;
 	int mbs = -1, ulen;
@@ -180,6 +216,7 @@ uint8_t *dbr_predict(kann_t *ua, const char *str, int ovlp_len)
 			b = 0;
 		}
 	}
+	if (min_mss_len > 0) dbr_predict_mss(l_seq, lbl, z, min_mss_len);
 
 	for (u = 0; u < ulen; ++u) { free(x[0][u]); free(x[1][u]); }
 	free(x[0]); free(x[1]); free(z); free(st);
@@ -189,13 +226,13 @@ uint8_t *dbr_predict(kann_t *ua, const char *str, int ovlp_len)
 int main(int argc, char *argv[])
 {
 	kann_t *ann = 0;
-	int c, n_layer = 1, n_neuron = 64, ulen = 150, to_apply = 0, to_eval = 0, out_fq = 0;
+	int c, n_layer = 1, n_neuron = 64, ulen = 150, to_apply = 0, to_eval = 0, out_fq = 0, min_mss_len = 16;
 	int batch_len = 10000000, mbs = 64, m_epoch = 25, n_threads = 1, is_tied = 1, seed = 11, ovlp_len = 50;
 	float h_dropout = 0.25f, lr = 0.001f, w0 = 0.0f;
 	char *fn_out = 0, *fn_in = 0;
 	ketopt_t o = KETOPT_INIT;
 
-	while ((c = ketopt(&o, argc, argv, 1, "Au:l:n:m:B:o:i:t:Tb:Ed:s:O:Sw:", 0)) >= 0) {
+	while ((c = ketopt(&o, argc, argv, 1, "Au:l:n:m:B:o:i:t:Tb:Ed:s:O:Sw:L:", 0)) >= 0) {
 		if (c == 'u') ulen = atoi(o.arg);
 		else if (c == 'l') n_layer = atoi(o.arg);
 		else if (c == 'n') n_neuron = atoi(o.arg);
@@ -212,6 +249,7 @@ int main(int argc, char *argv[])
 		else if (c == 'O') ovlp_len = atoi(o.arg);
 		else if (c == 'S') out_fq = 1;
 		else if (c == 'w') w0 = atof(o.arg);
+		else if (c == 'L') min_mss_len = atoi(o.arg);
 		else if (c == 'T') is_tied = 0; // for debugging only; weights should be tiled for DNA sequences
 		else if (c == 'b') {
 			double x;
@@ -246,6 +284,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "    -A         predict using a trained model (req. -i)\n");
 		fprintf(stderr, "    -E         predict and evaluate a trained model (req. -i)\n");
 		fprintf(stderr, "    -O INT     segment overlap length [%d]\n", ovlp_len);
+		fprintf(stderr, "    -L INT   min signal len (0 to disable) [%d]\n", min_mss_len);
 		return 1;
 	}
 	kann_srand(seed);
@@ -282,7 +321,7 @@ int main(int argc, char *argv[])
 		while (kseq_read(ks) >= 0) {
 			uint8_t *lbl;
 			int i;
-			lbl = dbr_predict(ua, ks->seq.s, ovlp_len);
+			lbl = dbr_predict(ua, ks->seq.s, ovlp_len, min_mss_len);
 			if (to_eval && ks->qual.l > 0) {
 				for (i = 0; i < ks->seq.l; ++i) {
 					int c = ks->qual.s[i] - 33;

@@ -23,7 +23,7 @@ gen-fq:gen-fq.o
 dna-cnn:dna-cnn.o $(OBJS)
 		$(CC) -o $@ $^ $(LIBS)
 
-dna-brnn:dna-brnn.o $(OBJS)
+dna-brnn:dna-brnn.o mss.o $(OBJS)
 		$(CC) -o $@ $^ $(LIBS)
 
 clean:
@@ -34,9 +34,10 @@ depend:
 
 # DO NOT DELETE
 
-dna-brnn.o: ketopt.h dna-io.h kann.h kautodiff.h
+dna-brnn.o: ketopt.h dna-io.h kann.h kautodiff.h mss.h kseq.h
 dna-cnn.o: ketopt.h kann.h kautodiff.h dna-io.h kseq.h
 dna-io.o: dna-io.h kseq.h
 gen-fq.o: ketopt.h kseq.h khash.h
 kann.o: kann.h kautodiff.h
 kautodiff.o: kautodiff.h
+mss.o: mss.h
