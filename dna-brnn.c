@@ -284,7 +284,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "    -A         predict using a trained model (req. -i)\n");
 		fprintf(stderr, "    -E         predict and evaluate a trained model (req. -i)\n");
 		fprintf(stderr, "    -O INT     segment overlap length [%d]\n", ovlp_len);
-		fprintf(stderr, "    -L INT   min signal len (0 to disable) [%d]\n", min_mss_len);
+		fprintf(stderr, "    -L INT     min signal len (0 to disable) [%d]\n", min_mss_len);
 		return 1;
 	}
 	kann_srand(seed);
