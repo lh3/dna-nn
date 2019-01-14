@@ -11,7 +11,7 @@
 #include "kseq.h"
 KSEQ_DECLARE(gzFile)
 
-#define DBR_VERSION "r32"
+#define DBR_VERSION "r34"
 
 kann_t *dbr_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, float w0, int is_tied)
 {
@@ -216,6 +216,9 @@ uint8_t *dbr_predict(kann_t *ua, const char *str, int ovlp_len, int min_mss_len)
 			b = 0;
 		}
 	}
+	for (i = 0; i < l_seq; ++i)
+		if (seq_nt4_table[(uint8_t)str[i]] >= 4)
+			lbl[i] = 0, z[i] = 1.0f;
 	if (min_mss_len > 0) dbr_predict_mss(l_seq, lbl, z, min_mss_len);
 
 	for (u = 0; u < ulen; ++u) { free(x[0][u]); free(x[1][u]); }
