@@ -24,7 +24,9 @@ To find (ATTCC)n and alpha satellites for long contigs,
 ```sh
 ./dna-brnn -Ai models/attcc-alpha.knm -B256 -t16 asm.fa > asm.bed
 ```
-If the input FASTA mostly consists of sequences less than 10kb, it will be
+The output is a BED file. A label `1` on the 4th column indicates the interval
+is a region of (AATTC)n ; label `2` indicates a region of alpha satellites. If
+the input FASTA mostly consists of sequences less than 10kb, it will be
 faster to reduce `-B`:
 ```sh
 ./dna-brnn -Ai models/attcc-alpha.knm -B64 -t16 short-seq.fa > short-seq.bed
