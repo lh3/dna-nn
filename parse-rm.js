@@ -48,9 +48,9 @@ while (file.readline(buf) >= 0) {
 	}
 	if (ctg != null) {
 		var type = null;
-		if (fam == "SINE/Alu") type = "3";
+		if (fam == "SINE/Alu") type = "4";
 		else if (rep == "ALR/Alpha") type = "2";
-		else if (rep == "BSR/Beta" || rep == "LSAU") type = "4";
+		else if (rep == "BSR/Beta" || rep == "LSAU") type = "3";
 		else if (rep == "HSATII") type = "1";
 		else if (fam == "LINE/L1") type = "5";
 		else if ((fam == "Simple_repeat" || fam == "Satellite") && ((m4 = /^\(([ACGT]+)\)n/.exec(rep)) != null)) {
