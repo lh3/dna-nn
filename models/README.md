@@ -1,8 +1,9 @@
 ## ATTCC and Alpha centromeric satellites
 
-* Model file: `attcc-alpha.knm`
 * Purpose: to identify (ATTCC)n and alpha centromeric [satellites][sat] in
   human
+* Model file: `attcc-alpha.knm`
+* Lables: `1` for the (ATTCC)n microsatellite; `2` for the alpha satellite.
 * Training data: chr11 in GRCh37, alpha satellites on other chromosomes and
   GRCh37 decoy. Annotations on GRCh37 was acquired from UCSC. Annotations on
   decoys were generated with [RepeatMasker][rm]-4.0.8, [rmBlast][rmb]-2.6.0+
