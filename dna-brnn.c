@@ -11,7 +11,7 @@
 #include "kseq.h"
 KSEQ_DECLARE(gzFile)
 
-#define DBR_VERSION "r34"
+#define DBR_VERSION "r40"
 
 kann_t *dbr_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, float w0, int is_tied)
 {
@@ -124,18 +124,15 @@ void dbr_train(kann_t *ann, dn_seqs_t *dr, int ulen, float lr, int m_epoch, int 
 
 void dbr_predict_mss(int l, uint8_t *lbl, float *z, int min_mss_len)
 {
-	const double sig_cap = 0.99, large = -1e3;
+	const double sig_cap = 0.99, factor = 10.0;
 	msseg_t *segs;
 	double *s, min_sc;
 	int i, k, n_segs, st;
 	min_sc = log(sig_cap / (1.0 - sig_cap)) * min_mss_len;
 	s = (double*)calloc(l, sizeof(double));
 	for (i = 0; i < l; ++i) {
-		if (lbl[i] == 0)
-			s[i] = z[i] > sig_cap? large : -log(z[i] / (1.0 - z[i]));
-		else
-			s[i] = log(z[i] < sig_cap? z[i] / (1.0 - z[i]) : sig_cap / (1.0 - sig_cap));
-		//fprintf(stderr, "%d\t%d\t%g\t%g\n", i, lbl[i], z[i], s[i]);
+		s[i] = log(z[i] < sig_cap? z[i] / (1.0 - z[i]) : sig_cap / (1.0 - sig_cap));
+		if (lbl[i] == 0) s[i] *= -factor;
 	}
 	segs = mss_find_all(l, s, min_sc, &n_segs);
 	for (k = 0, st = 0; k < n_segs; ++k) {
