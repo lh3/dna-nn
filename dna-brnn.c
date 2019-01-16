@@ -11,7 +11,7 @@
 #include "kseq.h"
 KSEQ_DECLARE(gzFile)
 
-#define DBR_VERSION "r40"
+#define DBR_VERSION "r41"
 
 kann_t *dbr_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, float w0, int is_tied)
 {
@@ -153,7 +153,7 @@ void dbr_predict_mss(int l, uint8_t *lbl, float *z, int min_mss_len)
 	free(s);
 }
 
-uint8_t *dbr_predict(kann_t *ua, const char *str, int ovlp_len, int min_mss_len)
+uint8_t *dbr_predict(kann_t *ua, const char *str, int ovlp_len, int min_mss_len, int use_mss)
 {
 	float **x[2], *z;
 	int mbs = -1, ulen;
@@ -215,8 +215,20 @@ uint8_t *dbr_predict(kann_t *ua, const char *str, int ovlp_len, int min_mss_len)
 	}
 	for (i = 0; i < l_seq; ++i)
 		if (seq_nt4_table[(uint8_t)str[i]] >= 4)
-			lbl[i] = 0, z[i] = 1.0f;
-	if (min_mss_len > 0) dbr_predict_mss(l_seq, lbl, z, min_mss_len);
+			lbl[i] = 0, z[i] = 1.0;
+	if (use_mss)
+		dbr_predict_mss(l_seq, lbl, z, min_mss_len);
+	else {
+		int j, sig_st = 0;
+		for (i = 1; i <= l_seq; ++i) {
+			if (i == l_seq || lbl[i] != lbl[i-1]) {
+				if (i - sig_st < min_mss_len)
+					for (j = sig_st; j < i; ++j)
+						lbl[j] = 0;
+				sig_st = i;
+			}
+		}
+	}
 
 	for (u = 0; u < ulen; ++u) { free(x[0][u]); free(x[1][u]); }
 	free(x[0]); free(x[1]); free(z); free(st);
@@ -227,12 +239,12 @@ int main(int argc, char *argv[])
 {
 	kann_t *ann = 0;
 	int c, n_layer = 1, n_neuron = 64, ulen = 150, to_apply = 0, to_eval = 0, out_fq = 0, min_mss_len = 50;
-	int batch_len = 10000000, mbs = 64, m_epoch = 25, n_threads = 1, is_tied = 1, seed = 11, ovlp_len = 50;
+	int batch_len = 10000000, mbs = 64, m_epoch = 25, n_threads = 1, is_tied = 1, seed = 11, ovlp_len = 50, use_mss = 1;
 	float h_dropout = 0.25f, lr = 0.001f, w0 = 0.0f;
 	char *fn_out = 0, *fn_in = 0;
 	ketopt_t o = KETOPT_INIT;
 
-	while ((c = ketopt(&o, argc, argv, 1, "Au:l:n:m:B:o:i:t:Tb:Ed:s:O:Sw:L:", 0)) >= 0) {
+	while ((c = ketopt(&o, argc, argv, 1, "Au:l:n:m:B:o:i:t:Tb:Ed:s:O:Sw:L:M", 0)) >= 0) {
 		if (c == 'u') ulen = atoi(o.arg);
 		else if (c == 'l') n_layer = atoi(o.arg);
 		else if (c == 'n') n_neuron = atoi(o.arg);
@@ -250,6 +262,7 @@ int main(int argc, char *argv[])
 		else if (c == 'S') out_fq = 1;
 		else if (c == 'w') w0 = atof(o.arg);
 		else if (c == 'L') min_mss_len = atoi(o.arg);
+		else if (c == 'M') use_mss = 0;
 		else if (c == 'T') is_tied = 0; // for debugging only; weights should be tiled for DNA sequences
 		else if (c == 'b') {
 			double x;
@@ -321,7 +334,7 @@ int main(int argc, char *argv[])
 		while (kseq_read(ks) >= 0) {
 			uint8_t *lbl;
 			int i;
-			lbl = dbr_predict(ua, ks->seq.s, ovlp_len, min_mss_len);
+			lbl = dbr_predict(ua, ks->seq.s, ovlp_len, min_mss_len, use_mss);
 			if (to_eval && ks->qual.l > 0) {
 				for (i = 0; i < ks->seq.l; ++i) {
 					int c = ks->qual.s[i] - 33;
