@@ -8,6 +8,6 @@ typedef struct {
     MSS_FLOAT sc;
 } msseg_t;
 
-msseg_t *mss_find_all(int n, const MSS_FLOAT *S, MSS_FLOAT min_sc, int *n_seg);
+msseg_t *mss_find_all(int n, const MSS_FLOAT *S, MSS_FLOAT min_sc, MSS_FLOAT xdrop, int *n_seg);
 
 #endif

@@ -28,7 +28,9 @@ typedef struct {
 typedef kvec_t(msseg_t) msseg_v;
 typedef kvec_t(msseg_aux_t) msseg_aux_v;
 
-static void add_segs(msseg_v *ret, msseg_aux_v *seg, int min_sc)
+#define NEG_INF (-1e30)
+
+static void move_segs(msseg_v *ret, msseg_aux_v *seg, int min_sc)
 {
     int i;
     for (i = 0; i < seg->n; ++i) {
@@ -42,20 +44,22 @@ static void add_segs(msseg_v *ret, msseg_aux_v *seg, int min_sc)
     seg->n = 0;
 }
 
-msseg_t *mss_find_all(int n, const MSS_FLOAT *S, MSS_FLOAT min_sc, int *n_seg)
+// Reference: Ruzzo and Tompa (1999) A linear time algorithm for finding all maximal scoring subsequencs
+msseg_t *mss_find_all(int n, const MSS_FLOAT *S, MSS_FLOAT min_sc, MSS_FLOAT xdrop, int *n_seg)
 {
     int i, j;
-    MSS_FLOAT L;
+    MSS_FLOAT L, max;
     msseg_v ret = {0,0,0};
     msseg_aux_v seg = {0,0,0};
     msseg_aux_t t;
 
-    for (i = L = 0; i < n;) {
+    for (i = 0, L = 0.0, max = NEG_INF; i < n;) {
         if (S[i] > 0) {
             int k;
             MSS_FLOAT R = L + S[i];
             for (k = i + 1; k < n && S[k] > 0.; ++k)
                 R += S[k];
+			if (R > max) max = R;
             t.st = i, t.en = k, t.L = L, t.R = R;
             while (1) {
                 msseg_aux_t *p;
@@ -69,16 +73,22 @@ msseg_t *mss_find_all(int n, const MSS_FLOAT *S, MSS_FLOAT min_sc, int *n_seg)
                     t.st = p->st, t.L = p->L, t.pre = p->pre;
                     seg.n = j;
                 } else {
-                    if (j < 0) add_segs(&ret, &seg, min_sc);
+                    if (j < 0) move_segs(&ret, &seg, min_sc);
                     t.pre = j;
                     kv_push(msseg_aux_t, seg, t);
                     break;
                 }
             }
             L = R, i = k;
-        } else L += S[i++];
+        } else {
+			if (xdrop > 0.0 && L + S[i] + xdrop < max) { // reset
+				move_segs(&ret, &seg, min_sc);
+				L = 0.0, max = NEG_INF;
+			}
+			L += S[i++];
+		}
     }
-    add_segs(&ret, &seg, min_sc);
+    move_segs(&ret, &seg, min_sc);
     free(seg.a);
     ret.a = (msseg_t*)realloc(ret.a, ret.n * sizeof(msseg_t));
     *n_seg = ret.n;
