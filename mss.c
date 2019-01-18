@@ -73,7 +73,10 @@ msseg_t *mss_find_all(int n, const MSS_FLOAT *S, MSS_FLOAT min_sc, MSS_FLOAT xdr
                     t.st = p->st, t.L = p->L, t.pre = p->pre;
                     seg.n = j;
                 } else {
-                    if (j < 0) move_segs(&ret, &seg, min_sc);
+                    if (j < 0) {
+						move_segs(&ret, &seg, min_sc);
+						max = R;
+					}
                     t.pre = j;
                     kv_push(msseg_aux_t, seg, t);
                     break;
