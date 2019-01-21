@@ -20,7 +20,7 @@
 \title{Efficient identification of centromeric satellites with dna-brnn}
 \author[Li]{Heng Li$^{1,2,3}$}
 \address{$^1$ Department of data sciences, Dana-Farber Cancer Institute, 450 Brookline Ave, Boston, MA 02115, USA\\
-$^2$ Department of biomedical informatics, Havard Medical School, 25 Shattuck Street, Boston, MA 02115, USA\\
+$^2$ Department of biomedical informatics, Harvard Medical School, 25 Shattuck Street, Boston, MA 02115, USA\\
 $^3$ Broad Institute, 415 Main St, Cambridge, MA 02142, USA}
 
 \maketitle
@@ -72,7 +72,9 @@ each base with number $0,\ldots,m$, where `0' stands for a null-feature.
 (BRNN), except that \mbox{dna-brnn} feeds the reverse complement sequence to the
 opposite GRU array and that it ties the weights in both directions. Dna-brnn is
 strand symmetric in that the network output is the same regardless of the input
-DNA strand. It is a novel model to the best of our knowledge.
+DNA strand. Strand symmetry is not just a nice theoretical property. Without
+weight sharing between the two strands, we will end up with a model with twice
+as many parameters but 16\% worse training cost (averaged in 10 runs).
 
 In theory, we can directly apply dna-brnn to arbitrarily long sequences.
 However, given a single sequence or multiple sequences of variable lengths, it
@@ -100,7 +102,7 @@ both directions share the same weights.}\label{fig:model}
 
 In training, we randomly sample 256 subsequences of 150bp in length and update
 the model weights with RMSprop on this minibatch. To reduce overfitting, we
-randomly drop out 25\% elements in the GRU hidden vectors. We terminate
+randomly drop out 25\% elements in the hidden vectors. We terminate
 training after processing 250Mb randomly sampled bases.
 
 On prediction, we run the model in each 150bp long sliding window with 50bp
@@ -108,11 +110,11 @@ overlap. In each window, the label with the highest probability is taken as the
 preliminary prediction. In an overlap between two adjacent windows, the label
 with higher probability is taken as the prediction. Such a prediction
 algorithm works well in long arrays of satellites. However, it occasionally
-identifies satellites of a few bases when there is conflictive evidence. To
-address this issue, we propose an improvement.
+identifies satellites of a few bases when there is competing evidence. To
+address this issue, we propose a post-processing step.
 
-Recall that with the previous algorithm, we can predict label $c_i$ and its
-probability $p_i$ at each sequence postion $i$ on the query sequence. We
+With the previous algorithm, we can predict label $c_i$ and its
+probability $p_i$ at each sequence position $i$. We
 introduce a score $s_i$ which is computed as
 \begin{equation}\label{eq:sc}
 t_i=\log\frac{\min(p_i,0.99)}{1-\min(p_i,0.99)},\,\,\,
@@ -125,7 +127,7 @@ Here $s_i$ is usually positive at a predicted satellite base and negative at a
 non-satellite base. Let $S_{a,b}=\sum_{i=a}^b s_i$
 be the sum of scores over segment $[a,b]$. Intuitively, we say $[a,b]$ is
 maximal if it cannot be lengthened or shortened without reducing $S_{a,b}$.
-\citet{DBLP:conf/ismb/RuzzoT99} give a rigorous definition of maximal scoring
+\citet{DBLP:conf/ismb/RuzzoT99} gave a rigorous definition of maximal scoring
 segment (MSS) and a linear algorithm to find all of them. By default,
 dna-brnn takes an MSS longer than 50bp as a satellite segment. The use of MSS
 effectively clusters fragmented satellite predictions and improves the accuracy
@@ -133,19 +135,19 @@ in practice.
 
 \subsection{Training and testing data}
 
-The training data are composed of three sources: chromosome 11, annotated
+The training data come from three sources: chromosome 11, annotated
 alphoids in the reference genome and decoy sequences, all for GRCh37.
 RepeatMasker annotations on GRCh37 were acquired from the UCSC Genome Browser.
 Repeats on the GRCh37 decoy were obtained by us with RepeatMasker (v4.0.8,
 using rmblast-2.6.0+ as the alignment engine). RepeatMasker may annotate
 hsat2,3 as `HSATII', `(ATTCC)n', `(GGAAT)n', `(ATTCCATTCC)n' or other rotations
-of the ATTCC motif. We combine all such repeats into hsat2,3.  We take the
+of the ATTCC motif. We combined all such repeats into hsat2,3.  We take the
 RepeatMasker labeling as the ground truth.
 
-We use the training data to learn weights in the model. We additionally
-annotated GRCh38 decoy sequences with RepeatMasker and used that to tune
+We use the training data to learn weights in the model. We
+annotated GRCh38 decoy sequences~\citep{Mallick:2016aa} with RepeatMasker and used that to tune
 hyperparameters, such as the size of GRU and non-model parameters in
-Eq.~(\ref{eq:sc}). For testing, we randomly extracted 326Mb sequences from a
+Eq.~(\ref{eq:sc}). For testing, we randomly sampled 326Mb sequences from a
 CHM1 assembly (AC:GCA\_001297185.1) and annotated them with RepeatMasker as
 well. Testing data do not overlap training or validation data.
 
@@ -153,9 +155,9 @@ well. Testing data do not overlap training or validation data.
 
 Unlike the majority of deep learning based tools which are written in Python
 and depend on heavy framework such as TensorFlow, dna-brnn is implemented in C,
-on top of the lightweight KANN framework. KANN uses CPU only, supports
+on top of the lightweight KANN framework that we developed. KANN uses CPU only, supports
 parallelization and has no external dependencies. This makes dna-brnn easily
-deployable without requiring special hardware or software settings.
+deployed without requiring special hardware or software settings.
 
 We have also implemented dna-cnn, a strand-symmetric convolution neural network
 for a similar task. It predicts the fraction of each repeat class on a
@@ -167,13 +169,19 @@ per-base annotation.
 
 \section{Results}
 
-Dna-brnn takes 6.7 wall-clock minutes over 16 CPUs to train on the 250Mb
-training data, and takes 6.2 minutes to predict on the 326Mb testing data.
-With rmBlast as the alignment engine, RepeatMasker annotates the same data in
+Training dna-brnn takes 6.7 wall-clock minutes using 16 CPUs. Predicting labels
+on testing data takes 6.2 minutes.
+With rmblast as the alignment engine, RepeatMasker annotates the testing data in
 641 minutes using 32 CPUs, 100 times slower. Table~1 shows the testing accuracy
 with different prediction strategies. Applying MSS clustering improves both FNR
 and FPR. We use the `mss:Y, minLen:50' setting in the rest of the Results
 section.
+
+On the testing data, dnr-brnn predicts 70kb hsat2,3 satellites not annotated
+by RepeatMasker. We looked at them by eye and had the impression that most of
+them are divergent copies of (AATTC)n. Some of them are annotated as other
+types of tandem repeats; some are missed. The hsat2,3 FPR of dna-brnn should be
+lower considering that the RepeatMasker annotation may be incomplete.
 
 \begin{table}[tb]
 \processtable{Evaluation of dna-brnn accuracy}
@@ -200,26 +208,20 @@ being predicted as satellite by dna-brnn. A format `$1/x$' in the table implies
 one false positive prediction per $x$-bp.}\label{tab:eval}
 \end{table}
 
-On the testing data, dnr-brnn predicts 70kb hsat2,3 satellites not annotated
-by RepeatMasker. We looked at them by eye and had the impression that most of
-them are divergent copies of (AATTC)n. Some of them are annotated as other
-types of tandem repeats; some are missed. The hsat2,3 FPR of dna-brnn should be
-lower considering that the RepeatMasker annotation may be incomplete.
-
 We applied dna-brnn to the NA24385 CCS reads~\citep{Wenger519025}. 2.91\% read
 bases are alphoid and 2.56\% are hsat2,3. If we assume the human genome is 3Gb
 in size, these two classes of satellites contribute 164Mb per haploid genome
 for this individual. CHM1 assembles 50Mb hsat2,3 and 56Mb alphoid, though 70\%
 of them are in short isolated contigs, not connected to non-repetitive regions.
-In the reference genome GRCh37, both classes are significantly depleted,
-contributing to $<$0.3\% of the genome. GRCh38 includes computationally
-generated alphoid but still lacks hsat2,3 ($<$0.1\%). Partly due to this,
+In the reference genome GRCh37, both classes are significantly depleted ($<$0.3\% of the genome).
+GRCh38 includes computationally
+generated alphoids but still lacks hsat2,3 ($<$0.1\%). Partly due to this,
 82\% of human novel sequences found by~\citet{Sherman:2018aa} are hsat2,3.
-Novel euchromatin sequences are significantly less.
+There are significantly less novel sequences in euchromatin.
 
 We have also trained dna-brnn to identify the Alu repeats to high accuracy.
 Learning beta satellites, another class of centromeric repeats, is harder. We
-can achieve moderate accuracy with larger hidden layers. However, both dna-brnn
+can only achieve moderate accuracy with larger hidden layers. Both dna-brnn
 and dna-cnn fail to learn the L1 repeats, which are longer, more divergent and
 more fragmented. We are not sure if this is caused by the limited capacity of
 dna-brnn or by innate ambiguity in the RepeatMasker annotation.
@@ -227,7 +229,7 @@ dna-brnn or by innate ambiguity in the RepeatMasker annotation.
 \section{Conclusion}
 
 Dna-brnn is a fast and handy tool to annotate centromeric satellites on
-high-throughput sequence data. It may help biologists to understand the
+high-throughput sequence data and may help biologists to understand the
 evolution of these repeats. Dna-brnn is also a general approach to modeling DNA
 sequences. It can potentially learn other sequence features and can be easily
 adapted to different types of sequence classification problems.
