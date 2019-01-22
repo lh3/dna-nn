@@ -11,7 +11,7 @@
 #include "kseq.h"
 KSEQ_DECLARE(gzFile)
 
-#define DBR_VERSION "r43"
+#define DBR_VERSION "r51"
 
 kann_t *dbr_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, float w0, int is_tied)
 {
@@ -155,12 +155,12 @@ void dbr_predict_mss(int l, uint8_t *lbl, float *z, int min_mss_len, int xdrop_l
 	free(s);
 }
 
-uint8_t *dbr_predict(kann_t *ua, const char *str, int ovlp_len, int min_mss_len, int xdrop_len, int use_mss)
+void dbr_predict(kann_t *ua, dn_bseq_t *bs, int ovlp_len, int min_mss_len, int xdrop_len, int use_mss)
 {
-	float **x[2], *z;
+	float **x[2], **z;
+	uint64_t *st;
 	int mbs = -1, ulen;
-	int step, n_lbl, l_seq, i, j, b, u, *st;
-	uint8_t *lbl;
+	int step, n_lbl, i, j, t, b, u;
 	kad_node_t *out;
 
 	assert(ovlp_len >= 0);
@@ -181,60 +181,70 @@ uint8_t *dbr_predict(kann_t *ua, const char *str, int ovlp_len, int min_mss_len,
 	kann_feed_bind(ua, KANN_F_IN, 1, x[0]);
 	kann_feed_bind(ua, KANN_F_IN, 2, x[1]);
 
-	l_seq = strlen(str);
-	lbl = (uint8_t*)calloc(l_seq, 1);
-	z = (float*)calloc(l_seq, sizeof(float));
-	st = (int*)calloc(mbs, sizeof(int));
+	st = (uint64_t*)calloc(mbs, sizeof(uint64_t));
+	z = (float**)malloc(bs->n * sizeof(float*));
+	for (t = 0; t < bs->n; ++t)
+		z[t] = (float*)calloc(bs->a[t].len, sizeof(float));
 
-	for (i = b = 0; i < l_seq; i += step) {
-		for (j = i; j < l_seq && j < i + ulen; ++j) {
-			int c = seq_nt4_table[(uint8_t)str[j]];
-			int u = j - i;
-			if (c >= 4) continue;
-			x[0][u][b * 4 + c] = 1.0f;
-			x[1][ulen - 1 - u][b * 4 + (3 - c)] = 1.0f;
-		}
-		st[b++] = i;
-		if (b == mbs || i + step >= l_seq) {
-			int k;
-			kann_eval_out(ua);
-			for (k = 0; k < b; ++k) {
-				for (j = st[k]; j < l_seq && j < st[k] + ulen; ++j) {
-					int u = j - st[k], a, max_a;
-					float *y = &out->x[(u * mbs + k) * n_lbl], max;
-					max_a = 0, max = y[0];
-					for (a = 1; a < n_lbl; ++a)
-						if (y[a] > max) max = y[a], max_a = a;
-					if (max > z[j]) z[j] = max, lbl[j] = max_a;
+	for (t = b = 0; t < bs->n; ++t) {
+		dn_bseq1_t *s = &bs->a[t];
+		s->lbl = (uint8_t*)calloc(s->len, 1);
+		for (i = 0; i < s->len; i += step) {
+			for (j = i; j < s->len && j < i + ulen; ++j) {
+				int u = j - i, c = seq_nt4_table[(uint8_t)s->seq[j]];
+				if (c >= 4) continue;
+				x[0][u][b * 4 + c] = 1.0f;
+				x[1][ulen - 1 - u][b * 4 + (3 - c)] = 1.0f;
+			}
+			st[b++] = (uint64_t)t << 32 | i;
+			if (b == mbs || (t == bs->n - 1 && i + ulen >= s->len)) {
+				int k;
+				kann_eval_out(ua);
+				for (k = 0; k < b; ++k) {
+					int sid = st[k] >> 32, pos = (int32_t)st[k];
+					for (j = pos; j < bs->a[sid].len && j < pos + ulen; ++j) {
+						int u = j - pos, a, max_a;
+						float *y = &out->x[(u * mbs + k) * n_lbl], max;
+						max_a = 0, max = y[0];
+						for (a = 1; a < n_lbl; ++a)
+							if (y[a] > max) max = y[a], max_a = a;
+						if (max > z[sid][j]) z[sid][j] = max, bs->a[sid].lbl[j] = max_a;
+					}
 				}
+				for (u = 0; u < ulen; ++u) {
+					memset(x[0][u], 0, 4 * mbs * sizeof(float));
+					memset(x[1][u], 0, 4 * mbs * sizeof(float));
+				}
+				b = 0;
 			}
-			for (u = 0; u < ulen; ++u) {
-				memset(x[0][u], 0, 4 * mbs * sizeof(float));
-				memset(x[1][u], 0, 4 * mbs * sizeof(float));
-			}
-			b = 0;
+			if (i + ulen >= s->len) break;
 		}
 	}
-	for (i = 0; i < l_seq; ++i)
-		if (seq_nt4_table[(uint8_t)str[i]] >= 4)
-			lbl[i] = 0, z[i] = 1.0;
-	if (use_mss)
-		dbr_predict_mss(l_seq, lbl, z, min_mss_len, xdrop_len);
-	else {
-		int j, sig_st = 0;
-		for (i = 1; i <= l_seq; ++i) {
-			if (i == l_seq || lbl[i] != lbl[i-1]) {
-				if (i - sig_st < min_mss_len)
-					for (j = sig_st; j < i; ++j)
-						lbl[j] = 0;
-				sig_st = i;
+
+	for (t = 0; t < bs->n; ++t) {
+		dn_bseq1_t *s = &bs->a[t];
+		for (i = 0; i < s->len; ++i)
+			if (seq_nt4_table[(uint8_t)s->seq[i]] >= 4)
+				s->lbl[i] = 0, z[t][i] = 1.0;
+		if (use_mss)
+			dbr_predict_mss(s->len, s->lbl, z[t], min_mss_len, xdrop_len);
+		else {
+			int j, sig_st = 0;
+			for (i = 1; i <= s->len; ++i) {
+				if (i == s->len || s->lbl[i] != s->lbl[i-1]) {
+					if (i - sig_st < min_mss_len)
+						for (j = sig_st; j < i; ++j)
+							s->lbl[j] = 0;
+					sig_st = i;
+				}
 			}
 		}
 	}
 
 	for (u = 0; u < ulen; ++u) { free(x[0][u]); free(x[1][u]); }
-	free(x[0]); free(x[1]); free(z); free(st);
-	return lbl;
+	free(x[0]); free(x[1]); free(st);
+	for (t = 0; t < bs->n; ++t) free(z[t]);
+	free(z);
 }
 
 int main(int argc, char *argv[])
@@ -338,9 +348,9 @@ int main(int argc, char *argv[])
 		kann_switch(ua, 0);
 		while (dn_bseq_read(ks, &bs, batch_len) > 0) {
 			int j, i;
+			dbr_predict(ua, &bs, ovlp_len, min_mss_len, xdrop_len, use_mss);
 			for (j = 0; j < bs.n; ++j) {
 				dn_bseq1_t *s = &bs.a[j];
-				s->lbl = dbr_predict(ua, s->seq, ovlp_len, min_mss_len, xdrop_len, use_mss);
 				if (to_eval && s->qual) {
 					for (i = 0; i < s->len; ++i) {
 						int c = s->qual[i] - 33;
