@@ -116,12 +116,13 @@ int dn_bseq_read(void *ks_, dn_bseq_t *bs, int max)
 	while ((ret = kseq_read(ks)) >= 0) {
 		if (bs->n == bs->m) {
 			bs->m = bs->m? bs->m + (bs->m>>1) : 16;
-			bs->s = (char**)realloc(bs->s, bs->m * sizeof(char*));
-			bs->t = (uint8_t**)realloc(bs->s, bs->m * sizeof(uint8_t*));
+			bs->a = (dn_bseq1_t*)realloc(bs->a, bs->m * sizeof(dn_bseq1_t));
 		}
-		bs->s[bs->n] = (char*)malloc(ks->seq.l + 1);
-		strcpy(bs->s[bs->n], ks->seq.s);
-		bs->t[bs->n++] = 0;
+		bs->a[bs->n].seq  = strdup(ks->seq.s);
+		bs->a[bs->n].qual = ks->qual.l > 0? strdup(ks->qual.s) : 0;
+		bs->a[bs->n].name = strdup(ks->name.s);
+		bs->a[bs->n].len  = ks->seq.l;
+		bs->a[bs->n++].lbl  = 0;
 		n_bases += ks->seq.l;
 		if (n_bases >= max) break;
 	}
@@ -132,9 +133,11 @@ void dn_bseq_reset(dn_bseq_t *bs)
 {
 	int i;
 	for (i = 0; i < bs->n; ++i) {
-		free(bs->s[i]);
-		free(bs->t[i]);
+		free(bs->a[i].seq);
+		free(bs->a[i].qual);
+		free(bs->a[i].name);
+		free(bs->a[i].lbl);
 	}
-	free(bs->s); free(bs->t);
-	bs->n = bs->m = 0;
+	free(bs->a);
+	bs->n = bs->m = 0, bs->a = 0;
 }

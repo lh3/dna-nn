@@ -325,7 +325,7 @@ int main(int argc, char *argv[])
 		kseq_t *ks;
 		int n_lbl, *cnt;
 		kann_t *ua;
-		dn_bseq_t bs = {0,0,0,0};
+		dn_bseq_t bs = {0,0,0};
 
 		n_lbl = dbr_get_n_lbl(ann);
 		cnt = (int*)calloc(n_lbl * n_lbl, sizeof(int));
@@ -339,30 +339,30 @@ int main(int argc, char *argv[])
 		while (dn_bseq_read(ks, &bs, batch_len) > 0) {
 			int j, i;
 			for (j = 0; j < bs.n; ++j) {
-				uint8_t *lbl;
-				lbl = bs.t[i] = dbr_predict(ua, bs.s[i], ovlp_len, min_mss_len, xdrop_len, use_mss);
-				if (to_eval && ks->qual.l > 0) {
-					for (i = 0; i < ks->seq.l; ++i) {
-						int c = ks->qual.s[i] - 33;
+				dn_bseq1_t *s = &bs.a[j];
+				s->lbl = dbr_predict(ua, s->seq, ovlp_len, min_mss_len, xdrop_len, use_mss);
+				if (to_eval && s->qual) {
+					for (i = 0; i < s->len; ++i) {
+						int c = s->qual[i] - 33;
 						if (c < 0 || c >= n_lbl) continue;
-						++cnt[c * n_lbl + lbl[i]];
+						++cnt[c * n_lbl + s->lbl[i]];
 					}
 				}
 				if (out_fq) {
-					printf("@%s\n", ks->name.s);
-					puts(ks->seq.s);
+					printf("@%s\n", s->name);
+					puts(s->seq);
 					printf("+\n");
-					for (i = 0; i < ks->seq.l; ++i) lbl[i] += 33;
-					fwrite(lbl, 1, ks->seq.l, stdout);
+					for (i = 0; i < s->len; ++i) s->lbl[i] += 33;
+					fwrite(s->lbl, 1, s->len, stdout);
 					putchar('\n');
 				} else {
 					int st = 0, x = 0;
-					for (i = 0; i <= ks->seq.l; ++i) {
-						if (i == ks->seq.l || lbl[i] == 0) {
-							if (x > 0) printf("%s\t%d\t%d\t%d\n", ks->name.s, st, i, x);
-							if (i == ks->seq.l) break;
+					for (i = 0; i <= s->len; ++i) {
+						if (i == s->len || s->lbl[i] == 0) {
+							if (x > 0) printf("%s\t%d\t%d\t%d\n", s->name, st, i, x);
+							if (i == s->len) break;
 							st = x = 0;
-						} else if (x == 0) st = i, x = lbl[i];
+						} else if (x == 0) st = i, x = s->lbl[i];
 					}
 				}
 			}

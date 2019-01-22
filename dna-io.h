@@ -12,9 +12,14 @@ typedef struct {
 } dn_seqs_t;
 
 typedef struct {
+	int len;
+	char *name, *seq, *qual;
+	uint8_t *lbl;
+} dn_bseq1_t;
+
+typedef struct {
 	 int m, n;
-	 char **s;
-	 uint8_t **t;
+	 dn_bseq1_t *a;
 } dn_bseq_t;
 
 extern unsigned char seq_nt4_table[256];
