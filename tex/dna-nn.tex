@@ -2,22 +2,13 @@
 \copyrightyear{2019}
 \pubyear{2019}
 
-\usepackage{graphicx}
-\usepackage{hyperref}
-\usepackage{url}
-\usepackage{amsmath}
-\usepackage[ruled,vlined]{algorithm2e}
-\newcommand\mycommfont[1]{\footnotesize\rmfamily{\it #1}}
-
 \usepackage{natbib}
 \bibliographystyle{apalike}
-
-\DeclareMathOperator*{\argmax}{argmax}
 
 \begin{document}
 \firstpage{1}
 
-\title{Efficient identification of centromeric satellites with dna-brnn}
+\title{Identifying centromeric satellites with dna-brnn}
 \author[Li]{Heng Li$^{1,2,3}$}
 \address{$^1$ Department of data sciences, Dana-Farber Cancer Institute, 450 Brookline Ave, Boston, MA 02115, USA\\
 $^2$ Department of biomedical informatics, Harvard Medical School, 25 Shattuck Street, Boston, MA 02115, USA\\
@@ -32,8 +23,8 @@ several percent of the human genome. However, identifying these sequences with
 traditional algorithms is computationally intensive. Here we develop dna-brnn,
 a recurrent neural network to learn the sequences of the two classes of
 centromeric repeats. It achieves high similarity to RepeatMasker and is tens of
-times faster. Dna-brnn explores a novel application of deep learning and will
-potentially accelerate the study of the evolution of the two major repeat classes.
+times faster. Dna-brnn explores a novel application of deep learning and may
+accelerate the study of the evolution of the two repeat classes.
 
 \section{Availability and implementation:}
 \href{https://github.com/lh3/dna-nn}{https://github.com/lh3/dna-nn}
@@ -51,7 +42,7 @@ the ${\tt ATTCC}$ motif. They are totaled a couple of hundred megabases in
 length~\citep{Schneider:2017aa}. Both alphoid and hsat2,3 can be identified
 with RepeatMasker~\citep{Tarailo-Graovac:2009aa}. However, RepeatMasker is
 inefficient. Annotating a human long-read assembly may take several days using
-32 CPUs. In addition, RepeatMasker requires RepBase~\citep{Kapitonov:2008aa},
+32 CPUs; annotating high-coverage sequence reads is practically infeasible. In addition, RepeatMasker requires RepBase~\citep{Kapitonov:2008aa},
 which is not commercially free. In practice, we do not often apply RepeatMasker
 to human assemblies.
 
@@ -88,7 +79,8 @@ alphoid. The size of the GRU hidden vector is 32. There are $<$5000 free
 parameters in such a model.
 
 \begin{figure}[tb]
-\includegraphics[width=.49\textwidth]{dna-nn-fig}
+\centering
+\includegraphics[width=.45\textwidth]{dna-nn-fig}
 \caption{The dna-brnn model. Dna-brnn takes a $k$-long one-hot encoded DNA
 sequence as input. It feeds the input and its reverse complement to two arrays
 of gated recurrent units (GRUs) running in the opposite directions. At each
