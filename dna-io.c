@@ -108,3 +108,33 @@ void dn_destroy(dn_seqs_t *s)
 	free(s->len); free(s->sum_len);
 	free(s);
 }
+
+int dn_bseq_read(void *ks_, dn_bseq_t *bs, int max)
+{
+	int n_bases = 0, ret;
+	kseq_t *ks = (kseq_t*)ks_;
+	while ((ret = kseq_read(ks)) >= 0) {
+		if (bs->n == bs->m) {
+			bs->m = bs->m? bs->m + (bs->m>>1) : 16;
+			bs->s = (char**)realloc(bs->s, bs->m * sizeof(char*));
+			bs->t = (uint8_t**)realloc(bs->s, bs->m * sizeof(uint8_t*));
+		}
+		bs->s[bs->n] = (char*)malloc(ks->seq.l + 1);
+		strcpy(bs->s[bs->n], ks->seq.s);
+		bs->t[bs->n++] = 0;
+		n_bases += ks->seq.l;
+		if (n_bases >= max) break;
+	}
+	return ret >= -1? n_bases : ret;
+}
+
+void dn_bseq_reset(dn_bseq_t *bs)
+{
+	int i;
+	for (i = 0; i < bs->n; ++i) {
+		free(bs->s[i]);
+		free(bs->t[i]);
+	}
+	free(bs->s); free(bs->t);
+	bs->n = bs->m = 0;
+}
