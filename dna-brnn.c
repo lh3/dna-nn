@@ -11,7 +11,7 @@
 #include "kseq.h"
 KSEQ_DECLARE(gzFile)
 
-#define DBR_VERSION "r51"
+#define DBR_VERSION "r53"
 
 kann_t *dbr_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, float w0, int is_tied)
 {
@@ -250,7 +250,7 @@ void dbr_predict(kann_t *ua, dn_bseq_t *bs, int ovlp_len, int min_mss_len, int x
 int main(int argc, char *argv[])
 {
 	kann_t *ann = 0;
-	int c, n_layer = 1, n_neuron = 64, ulen = 150, to_apply = 0, to_eval = 0, out_fq = 0, min_mss_len = 50;
+	int c, n_layer = 1, n_neuron = 256, ulen = 150, to_apply = 0, to_eval = 0, out_fq = 0, min_mss_len = 50;
 	int batch_len = 10000000, mbs = 64, m_epoch = 25, n_threads = 1, is_tied = 1, seed = 11, ovlp_len = 50, xdrop_len = 50, use_mss = 1;
 	float h_dropout = 0.25f, lr = 0.001f, w0 = 0.0f;
 	char *fn_out = 0, *fn_in = 0;
