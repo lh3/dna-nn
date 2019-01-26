@@ -1,3 +1,5 @@
+## Introduction
+
 Dna-nn implements a proof-of-concept deep-learning model to learn relatively
 simple features on DNA sequences. So far it has been trained to identify the
 (ATTCC)n and alpha satellite repeats, which occupy over 5% of the human genome.
@@ -11,6 +13,9 @@ Dna-nn may have potentials to learn other types of sequence features. It can
 accurately identify Alu repeats as well. However, it has low sensitivity to
 Beta satellites and fails to learn L1 repeats even with more hidden neurons.
 
+
+## Installation
+
 Dna-nn is implemented in C and includes the source code of the [KANN][kann]
 deep-learning framework. The only external dependency is [zlib][zlib]. To
 compile,
@@ -20,6 +25,11 @@ cd dna-nn
 make
 ```
 
+
+## Usage
+
+### Applying a trained model
+
 To find (ATTCC)n and alpha satellites for long contigs,
 ```sh
 ./dna-brnn -Ai models/attcc-alpha.knm -t16 asm.fa > asm.bed
@@ -27,8 +37,19 @@ To find (ATTCC)n and alpha satellites for long contigs,
 The output is a BED file. A label `1` on the 4th column indicates the interval
 is a region of (AATTC)n ; label `2` indicates a region of alpha satellites.
 
+### Training
+
 Training and evaluation are more complex. I will document that part if there is
 general interest.
 
+
+## Citing dna-nn
+
+If you use dna-nn in your work, please cite its [preprint]:
+```txt
+Li, H (2019) Identifying centromeric satellites with dna-brnn. *arXiv:1901.07327*.
+```
+
 [zlib]: https://zlib.net/
 [kann]: https://github.com/attractivechaos/kann
+[pub]: https://arxiv.org/abs/1901.07327
