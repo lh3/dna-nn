@@ -47,7 +47,7 @@ general interest.
 
 If you use dna-nn in your work, please cite its [preprint]:
 ```txt
-Li, H (2019) Identifying centromeric satellites with dna-brnn. *arXiv:1901.07327*.
+Li, H (2019) Identifying centromeric satellites with dna-brnn. arXiv:1901.07327.
 ```
 
 [zlib]: https://zlib.net/
