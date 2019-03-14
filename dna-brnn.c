@@ -11,7 +11,7 @@
 #include "kseq.h"
 KSEQ_DECLARE(gzFile)
 
-#define DBR_VERSION "r54"
+#define DBR_VERSION "r59"
 
 kann_t *dbr_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, float w0, int is_tied)
 {
@@ -368,10 +368,10 @@ int main(int argc, char *argv[])
 				} else {
 					int st = 0, x = 0;
 					for (i = 0; i <= s->len; ++i) {
-						if (i == s->len || s->lbl[i] == 0) {
+						if (i == s->len || s->lbl[i] != x) {
 							if (x > 0) printf("%s\t%d\t%d\t%d\n", s->name, st, i, x);
 							if (i == s->len) break;
-							st = x = 0;
+							st = i, x = s->lbl[i];
 						} else if (x == 0) st = i, x = s->lbl[i];
 					}
 				}
