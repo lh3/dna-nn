@@ -11,7 +11,7 @@
 #include "kseq.h"
 KSEQ_DECLARE(gzFile)
 
-#define DBR_VERSION "r59"
+#define DBR_VERSION "r60"
 
 kann_t *dbr_model_gen(int n_lbl, int n_layer, int n_neuron, float h_dropout, float w0, int is_tied)
 {
@@ -333,12 +333,13 @@ int main(int argc, char *argv[])
 	} else if (ann) {
 		gzFile fp;
 		kseq_t *ks;
-		int n_lbl, *cnt;
+		int n_lbl;
+		int64_t *cnt;
 		kann_t *ua;
 		dn_bseq_t bs = {0,0,0};
 
 		n_lbl = dbr_get_n_lbl(ann);
-		cnt = (int*)calloc(n_lbl * n_lbl, sizeof(int));
+		cnt = (int64_t*)calloc(n_lbl * n_lbl, sizeof(int64_t));
 		fp = strcmp(argv[o.ind], "-")? gzopen(argv[o.ind], "r") : gzdopen(0, "r");
 		ks = kseq_init(fp);
 
@@ -389,7 +390,7 @@ int main(int argc, char *argv[])
 			for (a = 0; a < n_lbl; ++a) {
 				fprintf(stderr, "[M::%s] true label %d:", __func__, a);
 				for (b = 0; b < n_lbl; ++b)
-					fprintf(stderr, " %11d", cnt[a * n_lbl + b]);
+					fprintf(stderr, " %11lld", (long long)cnt[a * n_lbl + b]);
 				fputc('\n', stderr);
 			}
 		}
