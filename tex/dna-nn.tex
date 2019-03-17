@@ -48,9 +48,10 @@ RepeatMasker requires RepBase~\citep{Kapitonov:2008aa}, which is not
 commercially free. This further limits its uses.
 
 We reduce repeat annotation to a classification problem and solve the problem
-with a neural network. Because the repeat units of alphoid and hsat2,3 are
-short, we can learn their sequences with a small network and achieve high
-performance.
+with a recurrent neural network (RNN), which can be thought as an extension to
+non-profile hidden Markov model but with long-range memory. Because the repeat
+units of alphoid and hsat2,3 are short, we can learn their sequences with a
+small network and achieve high performance.
 
 \begin{methods}
 \section{Methods}
@@ -60,7 +61,7 @@ performance.
 Given $m$ types of non-overlapping features on a DNA sequence, we can label
 each base with number $0,\ldots,m$, where `0' stands for a null-feature.
 \mbox{Dna-brnn} learns how to label a DNA sequence. Its overall architecture
-(Fig.~\ref{fig:model}) is similar to an ordinary bidirected neural network
+(Fig.~\ref{fig:model}) is similar to an ordinary bidirected RNN
 (BRNN), except that \mbox{dna-brnn} feeds the reverse complement sequence to the
 opposite array of Gated Recurrent Units (GRUs) and that it ties the weights in both directions. Dna-brnn is
 strand symmetric in that the network output is the same regardless of the input
