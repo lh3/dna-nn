@@ -32,15 +32,36 @@ make
 
 To find (ATTCC)n and alpha satellites for long contigs,
 ```sh
-./dna-brnn -Ai models/attcc-alpha.knm -t16 asm.fa > asm.bed
+./dna-brnn -Ai models/attcc-alpha.knm -t16 seq.fa > seq.bed
 ```
 The output is a BED file. A label `1` on the 4th column indicates the interval
 is a region of (AATTC)n ; label `2` indicates a region of alpha satellites.
 
 ### Training
 
-Training and evaluation are more complex. I will document that part if there is
-general interest.
+Training dna-nn requires sequences in the FASTQ format, where each "base
+quality" indicates the label of the corresponding base.
+
+The following command lines shows how we generate the pre-trained model
+`attcc-alpha.knm`.
+```sh
+RepeatMasker -species human -pa 16 -e ncbi -xsmall -small -dir . train.fa
+# The last column indicates the label of each region in the output BED
+./parse-rm.js train.fa.out > train.rm.bed
+# Generate training data in FASTQ. Base qualities indicate labels.
+./gen-fq -m2 train.fa train.rm.bed > train.lb2.fq
+# Training. We trained 10 models with different random seeds
+./dna-brnn -t8 -n32 -b5m -m50 -s14 -o attcc-alpha.knm train.lb2.fq
+```
+
+### Evaluation
+
+With truth annotations in the FASTQ format, we can evaluate the accuracy of
+a model with
+```sh
+./dna-brnn -Ei models/attcc-alpha.knm -t16 seq.fa > /dev/null
+```
+The stderr output gives the accuracy for each label.
 
 
 ## Citing dna-nn
