@@ -99,8 +99,8 @@ In training, we randomly sampled 256 subsequences of 150bp in length and updated
 the model weights with RMSprop on this minibatch. To reduce overfitting, we
 randomly dropped out 25\% elements in the hidden vectors. We terminated
 training after processing 250Mb randomly sampled bases. We generated 10 models
-with different random seeds and choose the one with the best results based on
-the accuracy on the validation data.
+with different random seeds and selected the one with the best accuracy on the
+validation data.
 
 On prediction, we run the model in each 150bp long sliding window with 50bp
 overlap. In each window, the label with the highest probability is taken as the
