@@ -50,7 +50,7 @@ commercially free. This further limits its uses.
 We reduce repeat annotation to a classification problem and solve the problem
 with a recurrent neural network (RNN), which can be thought as an extension to
 non-profile hidden Markov model but with long-range memory. Because the repeat
-units of alphoid and hsat2,3 are short, we can learn their sequences with a
+units of alphoid and hsat2,3 are short, RNN can ``memorize'' their sequences with a
 small network and achieve high performance.
 
 \begin{methods}
@@ -100,7 +100,7 @@ In training, we randomly sampled 256 subsequences of 150bp in length and updated
 the model weights with RMSprop on this minibatch. To reduce overfitting, we
 randomly dropped out 25\% elements in the hidden vectors. We terminated
 training after processing 250Mb randomly sampled bases. We generated 10 models
-with different random seeds and selected the one with the best accuracy on the
+with different random seeds and manually selected the one with the best accuracy on the
 validation data.
 
 On prediction, we run the model in each 150bp long sliding window with 50bp
@@ -136,8 +136,8 @@ in practice.
 The training data come from three sources: chromosome 11, annotated alphoids in
 the reference genome and the decoy sequences, all for GRCh37.  RepeatMasker
 annotations on GRCh37 were acquired from the UCSC Genome Browser.  Repeats on
-the GRCh37 decoy were obtained by us with RepeatMasker (v4.0.8 with
-RepBase-23.11 and rmblast-2.6.0+). RepeatMasker may annotate hsat2,3 as
+the GRCh37 decoy were obtained by us with RepeatMasker (v4.0.8 with rmblast-2.6.0+ and the human section of
+RepBase-23.11). RepeatMasker may annotate hsat2,3 as
 `HSATII', `(ATTCC)n', `(GGAAT)n', `(ATTCCATTCC)n' or other rotations of the
 ATTCC motif. We combined all such repeats into hsat2,3. We take the
 RepeatMasker labeling as the ground truth.
@@ -230,8 +230,8 @@ sequences in euchromatin.
 
 We have also trained dna-brnn to identify the Alu repeats to high accuracy.
 Learning beta satellites, another class of centromeric repeats, is harder. We
-can only achieve moderate accuracy with larger hidden layers. Both dna-brnn
-and dna-cnn fail to learn the L1 repeats, which are longer, more divergent and
+can only achieve moderate accuracy with larger hidden layers. Dna-brnn
+fails to learn the L1 repeats, which are longer, more divergent and
 more fragmented. We are not sure if this is caused by the limited capacity of
 dna-brnn or by innate ambiguity in the RepeatMasker annotation.
 
