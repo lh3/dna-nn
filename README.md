@@ -45,9 +45,13 @@ quality" indicates the label of the corresponding base.
 The following command lines shows how we generate the pre-trained model
 `attcc-alpha.knm`.
 ```sh
+# Install the k8 javascript shell (if this has not been done)
+curl -L https://github.com/attractivechaos/k8/releases/download/v0.2.4/k8-0.2.4.tar.bz2 | tar -jxf -
+cp k8-0.2.4/k8-`uname -s` k8              # or copy it to a directory on your $PATH
+# Run RepeatMasker to generate truth data
 RepeatMasker -species human -pa 16 -e ncbi -xsmall -small -dir . train.fa
 # The last column indicates the label of each region in the output BED
-./parse-rm.js train.fa.out > train.rm.bed
+./k8 parse-rm.js train.fa.out > train.rm.bed
 # Generate training data in FASTQ. Base qualities indicate labels.
 ./gen-fq -m2 train.fa train.rm.bed > train.lb2.fq
 # Training. We trained 10 models with different random seeds
