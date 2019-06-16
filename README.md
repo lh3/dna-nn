@@ -71,10 +71,8 @@ The stderr output gives the accuracy for each label.
 ## Citing dna-nn
 
 If you use dna-nn in your work, please cite its [paper][pub]:
-```txt
-Li, H (2019) Identifying centromeric satellites with dna-brnn,
-*Bioinformatics*, doi:10.1093/bioinformatics/btz264
-```
+
+> Li, H (2019) Identifying centromeric satellites with dna-brnn, *Bioinformatics*, doi:10.1093/bioinformatics/btz264
 
 [zlib]: https://zlib.net/
 [kann]: https://github.com/attractivechaos/kann
